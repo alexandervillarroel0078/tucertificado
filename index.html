@@ -1,0 +1,1639 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificados de Lavado de Tanques</title>
+
+  <!-- ============================================================
+     TIPOGRAFÍA
+     - Barlow: cuerpo del certificado y de la interfaz (limpia, industrial)
+     - Lobster: nombre del negocio en la cabecera (trazo cursivo/con carácter)
+     ============================================================ -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,600&family=Barlow+Condensed:wght@600;700&family=Lobster&display=swap"
+    rel="stylesheet">
+
+  <!-- html2canvas: exportación del certificado a imagen PNG -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- jsPDF: exportación del certificado a PDF (carta horizontal) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+  <style>
+    /* ============================================================
+   0. TOKENS DE COLOR — INTERFAZ (se adapta a claro/oscuro)
+   El CERTIFICADO en sí usa colores fijos (es "papel impreso"),
+   definidos más abajo en la sección 3, y no cambian con el tema.
+   ============================================================ */
+    :root {
+      --bg: #eef1f6;
+      --panel: #ffffff;
+      --panel-border: #d6dce8;
+      --text: #1c2438;
+      --text-muted: #5c6580;
+      --accent: #1a3d8f;
+      --accent-dark: #0d2b6b;
+      --accent-red: #c0281c;
+      --input-bg: #ffffff;
+      --input-border: #c7d0e2;
+      --input-focus: #1a3d8f;
+      --danger-bg: #fbeceb;
+      --shadow: 0 8px 24px -12px rgba(13, 43, 107, 0.25);
+      --radius: 10px;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) {
+        --bg: #0f131d;
+        --panel: #171c2b;
+        --panel-border: #2b3348;
+        --text: #e8ecf7;
+        --text-muted: #9aa4c0;
+        --accent: #5b82d9;
+        --accent-dark: #3a5cb0;
+        --accent-red: #e2564a;
+        --input-bg: #1e2436;
+        --input-border: #39415c;
+        --input-focus: #5b82d9;
+        --danger-bg: #3a2020;
+        --shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.6);
+      }
+    }
+
+    :root[data-theme="dark"] {
+      --bg: #0f131d;
+      --panel: #171c2b;
+      --panel-border: #2b3348;
+      --text: #e8ecf7;
+      --text-muted: #9aa4c0;
+      --accent: #5b82d9;
+      --accent-dark: #3a5cb0;
+      --accent-red: #e2564a;
+      --input-bg: #1e2436;
+      --input-border: #39415c;
+      --input-focus: #5b82d9;
+      --danger-bg: #3a2020;
+      --shadow: 0 8px 28px -12px rgba(0, 0, 0, 0.6);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Barlow', system-ui, -apple-system, Segoe UI, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ============================================================
+   1. ESTRUCTURA DE LA APP (formulario + vista previa)
+   ============================================================ */
+    .topbar {
+      display: flex;
+      align-items: center;
+      gap: 10px 16px;
+      flex-wrap: wrap;
+      padding: 10px 20px;
+      background: var(--accent-dark);
+      color: #fff;
+    }
+
+    .topbar h1 {
+      font-size: 17px;
+      margin: 0;
+      font-weight: 700;
+      letter-spacing: .2px;
+    }
+
+    .topbar .subtitle {
+      font-size: 12px;
+      opacity: .75;
+      margin-top: 1px;
+    }
+
+    /* Acciones movidas al topbar (antes eran una barra aparte sobre el
+       preview): así el certificado gana alto visible y menos scroll. */
+    .topbar-actions {
+      margin-left: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 7px;
+    }
+
+    /* "Descargar imagen" resalta sobre el azul oscuro del topbar */
+    .topbar-actions .btn-primary {
+      background: #fff;
+      color: var(--accent);
+      border-color: #fff;
+    }
+
+    .topbar-actions .btn-primary:hover {
+      background: #eef2fb;
+    }
+
+    .topbar-actions .btn-secondary:hover,
+    .topbar-actions .btn-neutral:hover {
+      border-color: rgba(255, 255, 255, 0.55);
+    }
+
+    .app-grid {
+      display: grid;
+      grid-template-columns: minmax(300px, 400px) 1fr;
+      gap: 20px;
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 20px;
+      align-items: start;
+    }
+
+    /* Un item de grid no se encoge más allá del ancho mínimo de su
+   contenido (min-width:auto implícito) salvo que se le indique lo
+   contrario: sin esto, un solo elemento interno con contenido ancho
+   "empuja" la columna entera y el body termina con scroll horizontal. */
+    .form-panel,
+    .preview-panel {
+      min-width: 0;
+    }
+
+    @media (max-width: 900px) {
+      .app-grid {
+        grid-template-columns: 1fr;
+        padding: 12px;
+        gap: 16px;
+      }
+    }
+
+    /* ---------- Panel de formulario ---------- */
+    .form-panel {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .form-scroll {
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+      padding: 4px 18px 18px;
+    }
+
+    @media (max-width: 900px) {
+      .form-scroll {
+        max-height: none;
+        overflow: visible;
+      }
+    }
+
+    /* ---------- Scrollbars al tono del tema (--accent, se adapta a
+       claro/oscuro). Firefox: scrollbar-width/color; Chrome/Edge/Safari:
+       pseudo-elementos ::-webkit-scrollbar*. ---------- */
+    html,
+    .form-scroll,
+    .cert-viewport,
+    #f-product {
+      scrollbar-width: thin;
+      scrollbar-color: color-mix(in srgb, var(--accent) 55%, transparent) transparent;
+    }
+
+    html::-webkit-scrollbar,
+    .form-scroll::-webkit-scrollbar,
+    .cert-viewport::-webkit-scrollbar,
+    #f-product::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+      /* alto para la barra horizontal de .cert-viewport */
+    }
+
+    html::-webkit-scrollbar-track,
+    .form-scroll::-webkit-scrollbar-track,
+    .cert-viewport::-webkit-scrollbar-track,
+    #f-product::-webkit-scrollbar-track {
+      background: color-mix(in srgb, var(--accent) 8%, transparent);
+      border-radius: 8px;
+    }
+
+    html::-webkit-scrollbar-thumb,
+    .form-scroll::-webkit-scrollbar-thumb,
+    .cert-viewport::-webkit-scrollbar-thumb,
+    #f-product::-webkit-scrollbar-thumb {
+      background: color-mix(in srgb, var(--accent) 55%, transparent);
+      border-radius: 8px;
+    }
+
+    html::-webkit-scrollbar-thumb:hover,
+    .form-scroll::-webkit-scrollbar-thumb:hover,
+    .cert-viewport::-webkit-scrollbar-thumb:hover,
+    #f-product::-webkit-scrollbar-thumb:hover {
+      background: var(--accent);
+    }
+
+    .field-group {
+      border: 0;
+      margin: 0 0 6px;
+      padding: 14px 0 6px;
+      border-bottom: 1px solid var(--panel-border);
+    }
+
+    .field-group:last-of-type {
+      border-bottom: 0;
+    }
+
+    .field-group legend {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--accent);
+      padding: 0 0 8px;
+    }
+
+    .field {
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      display: block;
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 4px;
+    }
+
+    .field-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .field-row .field {
+      flex: 1;
+      min-width: 0;
+    }
+
+    input[type="text"],
+    input[type="tel"],
+    input[type="date"],
+    textarea {
+      width: 100%;
+      font: inherit;
+      font-size: 14.5px;
+      color: var(--text);
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 9px 10px;
+    }
+
+    textarea {
+      resize: none;
+      /* el alto lo maneja autoGrow(): crece con el contenido. El
+         max-height es un respaldo (scroll interno) para un pegado enorme. */
+      min-height: 64px;
+      max-height: 45vh;
+      overflow-y: auto;
+      line-height: 1.4;
+    }
+
+    /* contador de caracteres del campo "Producto utilizado" */
+    .char-count {
+      font-size: 11.5px;
+      color: var(--text-muted);
+      text-align: right;
+      margin-top: 3px;
+    }
+
+    .char-count.warn {
+      color: var(--accent-red);
+      font-weight: 600;
+    }
+
+    input:focus,
+    textarea:focus {
+      outline: none;
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--input-focus) 20%, transparent);
+    }
+
+    /* ---------- Panel de vista previa ---------- */
+    .preview-panel {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 7px 11px;
+      border-radius: 8px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+      transition: transform .05s ease;
+    }
+
+    .btn:active {
+      transform: scale(0.97);
+    }
+
+    .btn svg {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+    }
+
+    /* botones de solo ícono (WhatsApp, Nuevo certificado) → cuadrados */
+    #btnShare,
+    #btnNew {
+      padding: 7px 8px;
+      gap: 0;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent-dark);
+    }
+
+    .btn-whatsapp {
+      background: #25d366;
+      color: #08380f;
+    }
+
+    .btn-whatsapp:hover {
+      filter: brightness(0.95);
+    }
+
+    .btn-secondary {
+      background: var(--input-bg);
+      color: var(--text);
+      border-color: var(--input-border);
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--accent);
+    }
+
+    .btn-secondary.active {
+      background: var(--accent);
+      color: #fff;
+      border-color: var(--accent);
+    }
+
+    .btn-neutral {
+      background: var(--input-bg);
+      color: var(--text);
+      border-color: var(--input-border);
+    }
+
+    .btn-neutral:hover {
+      border-color: var(--accent);
+    }
+
+    .cert-stage {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 16px;
+      overflow: hidden;
+      /* Contexto para las unidades "cqw" del certificado: su tipografía
+     se escala respecto al ancho real de ESTE contenedor (no del
+     viewport), así que se ve bien tanto en la columna angosta del
+     formulario como a pantalla completa. */
+      container-type: inline-size;
+    }
+
+    .cert-viewport {
+      overflow-x: auto;
+      display: flex;
+      justify-content: center;
+    }
+
+    /* Numeración de página: solo se muestra al imprimir/exportar a PDF */
+    .cert-page-number {
+      display: none;
+    }
+
+    /* ---------- Modal: elegir formato para compartir por WhatsApp ---------- */
+    .share-modal {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      background: rgba(13, 43, 107, 0.45);
+    }
+
+    .share-modal[hidden] {
+      display: none;
+    }
+
+    .share-card {
+      background: var(--panel);
+      border: 1px solid var(--panel-border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
+      max-width: 360px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .share-card h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .share-card p {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: var(--text-muted);
+    }
+
+    .share-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .share-options .btn {
+      justify-content: center;
+      font-size: 14px;
+      padding: 12px;
+    }
+
+    .share-cancel {
+      margin-top: 14px;
+      background: none;
+      border: none;
+      font-family: inherit;
+      color: var(--text-muted);
+      font-size: 13px;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="topbar">
+    <div class="topbar-title">
+      <h1>Certificados de Lavado de Tanques</h1>
+      <div class="subtitle">Genera, descarga e imprime certificados sin conexión a internet</div>
+    </div>
+    <div class="topbar-actions">
+      <button class="btn btn-primary" id="btnDownload">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 3v13m0 0-4-4m4 4 4-4M5 21h14" />
+        </svg>
+        Descargar imagen
+      </button>
+      <button class="btn btn-whatsapp" id="btnShare" aria-label="Compartir por WhatsApp"
+        title="Compartir por WhatsApp">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path
+            d="M17.5 14.4c-.3-.1-1.7-.9-2-1s-.5-.1-.7.1-.8 1-.9 1.2-.3.2-.6.1a8 8 0 0 1-2.3-1.4 8.6 8.6 0 0 1-1.6-2c-.2-.3 0-.5.1-.6l.4-.5c.1-.2.2-.3.3-.5s0-.4 0-.5-.7-1.7-1-2.3-.5-.5-.7-.5h-.6a1.2 1.2 0 0 0-.8.4A3.6 3.6 0 0 0 5 9.6a6.3 6.3 0 0 0 1.3 3.3 14.4 14.4 0 0 0 5.5 4.9c.8.3 1.4.5 1.9.7a4.6 4.6 0 0 0 2.1.1 3.5 3.5 0 0 0 2.3-1.6 2.8 2.8 0 0 0 .2-1.6c-.1-.1-.3-.2-.6-.4z" />
+          <path d="M12 2a10 10 0 0 0-8.5 15.2L2 22l4.9-1.5A10 10 0 1 0 12 2z" fill="none" stroke="currentColor"
+            stroke-width="1.6" />
+        </svg>
+      </button>
+      <button class="btn btn-secondary" id="btnDownloadPdf">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <path d="M14 2v6h6" />
+          <path d="M8 13h1.5a1.5 1.5 0 0 1 0 3H8v-3zm0 0v5" />
+          <path d="M13 13v5h1a2 2 0 0 0 2-2v-1a2 2 0 0 0-2-2h-1z" />
+          <path d="M18.5 13H17v5" />
+          <path d="M17 15.5h1.3" />
+        </svg>
+        Descargar PDF
+      </button>
+      <button class="btn btn-neutral" id="btnNew" aria-label="Nuevo certificado" title="Nuevo certificado">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+  <div class="app-grid">
+
+    <!-- =========================== FORMULARIO =========================== -->
+    <section class="form-panel">
+      <div class="form-scroll">
+
+        <fieldset class="field-group">
+          <legend>Certificado</legend>
+          <div class="field">
+            <label for="f-certNumber">N° de certificado</label>
+            <input type="text" id="f-certNumber" placeholder="Ej: 001/2026">
+          </div>
+          <div class="field">
+            <label for="f-washDate">Fecha de lavado</label>
+            <input type="date" id="f-washDate">
+          </div>
+          <div class="field">
+            <label for="f-statement">Frase de certificación</label>
+            <input type="text" id="f-statement"
+              placeholder="Ej: Nos permitimos certificar el lavado de tanque interior y desinfección">
+          </div>
+        </fieldset>
+
+        <fieldset class="field-group">
+          <legend>Vehículo y conductor</legend>
+          <div class="field-row">
+            <div class="field">
+              <label for="f-plate">Placa</label>
+              <input type="text" id="f-plate" placeholder="Ej: 1234-ABC">
+            </div>
+            <div class="field">
+              <label for="f-brand">Marca</label>
+              <input type="text" id="f-brand" placeholder="Ej: Volvo FH 440">
+            </div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="f-color">Color</label>
+              <input type="text" id="f-color" placeholder="Ej: Blanco">
+            </div>
+            <div class="field">
+              <label for="f-license">Licencia de conducir</label>
+              <input type="text" id="f-license" placeholder="Ej: 4587412 Cat. P">
+            </div>
+          </div>
+          <div class="field">
+            <label for="f-driver">Conductor</label>
+            <input type="text" id="f-driver" placeholder="Ej: Marcelo Rojas Fernández">
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="f-company">Empresa</label>
+              <input type="text" id="f-company" placeholder="Ej: Transportes San Miguel">
+            </div>
+            <div class="field">
+              <label for="f-companyPhone">Teléfono</label>
+              <input type="tel" id="f-companyPhone" placeholder="Ej: 33012345">
+            </div>
+          </div>
+        </fieldset>
+
+        <fieldset class="field-group">
+          <legend>Producto y firma</legend>
+          <div class="field">
+            <label for="f-product">Producto utilizado</label>
+            <textarea id="f-product" maxlength="900"
+              placeholder="Detalle el químico y procedimiento usado"></textarea>
+            <div class="char-count" id="productCount" aria-live="polite">0 / 900</div>
+          </div>
+          <div class="field-row">
+            <div class="field">
+              <label for="f-signerName">Nombre de quien certifica</label>
+              <input type="text" id="f-signerName" placeholder="Ej: Jhonny Martínez">
+            </div>
+            <div class="field">
+              <label for="f-signerPhone">Teléfono de contacto</label>
+              <input type="tel" id="f-signerPhone" placeholder="Ej: 70012345">
+            </div>
+          </div>
+        </fieldset>
+
+      </div>
+    </section>
+
+    <!-- =========================== VISTA PREVIA =========================== -->
+    <section class="preview-panel">
+      <div class="cert-stage">
+        <div class="cert-viewport">
+          <!-- ================= CERTIFICADO (diseño fijo, tipo "papel") ================= -->
+          <div class="certificate" id="certificate">
+
+            <div class="cert-header">
+              <div class="cert-brand">
+                <div class="cert-eyebrow" id="certEyebrow">
+                  <svg class="cert-eyebrow-arc" viewBox="0 0 280 84"
+                    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                    role="img" aria-label="Estación de servicio y lavado">
+                    <defs>
+                      <path id="certEyebrowArcPath" d="M 10,80 A 150,150 0 0 1 270,80" fill="none"></path>
+                    </defs>
+                    <text class="cert-eyebrow-arc-text" text-anchor="middle">
+                      <textPath href="#certEyebrowArcPath" xlink:href="#certEyebrowArcPath"
+                        startOffset="50%" id="certEyebrowText">ESTACIÓN DE SERVICIO Y LAVADO</textPath>
+                    </text>
+                  </svg>
+                </div>
+                <div class="cert-logo" id="certLogo">
+                  <img id="certLogoImg" src="logo.png" alt="Logo del negocio">
+                </div>
+                <div class="cert-business-name" id="certBusinessName">Jomar</div>
+                <div class="cert-owner-line" id="certOwnerName">Prop. Ing. Miguel Ángel Martínez Durán</div>
+                <div class="cert-address-line" id="certAddressLine">Av. Marcelo Quiroga Santa Cruz #87 - 7° anillo
+                  entre la
+                  Av. Miguel de Cervantes y Av. Olímpica</div>
+                <div class="cert-phone-line" id="certPhoneLine">Cel: 776-97408 - 63544889</div>
+              </div>
+
+              <div class="cert-title-col">
+                <div class="cert-title-band">
+                  <div class="cert-title-text">CERTIFICADO DE LAVADO,
+                    DESINFECCIÓN Y MANTENIMIENTO DE TANQUE</div>
+                </div>
+                <div class="cert-vehicle-icons">
+                  <img src="certificado-imagenes/iconos/volvo.png" alt="">
+                  <img src="certificado-imagenes/iconos/auto4xx4.png" alt="">
+                  <img src="certificado-imagenes/iconos/transportador.png" alt="">
+                  <img src="certificado-imagenes/iconos/cargero.png" alt="">
+                </div>
+              </div>
+            </div>
+
+            <div class="cert-number-row">N° <span class="cert-number"
+                id="certNumber">196/2026</span></div>
+
+            <p class="cert-statement" id="certStatement">Nos permitimos certificar
+              el lavado de tanque interior y desinfección</p>
+
+            <div class="cert-data-block">
+              <div class="cert-watermark" aria-hidden="true">
+                <img src="certificado-imagenes/marca-agua/tractor.png" alt="">
+                <img src="certificado-imagenes/marca-agua/camion.png" alt="">
+              </div>
+              <div class="cert-data-grid">
+                <div class="cert-field"><span class="label">Placa:</span><span
+                    class="value" id="d-plate">1234-ABC</span></div>
+                <div class="cert-field"><span class="label">Marca:</span><span
+                    class="value" id="d-brand">Volvo FH 440</span></div>
+                <div class="cert-field"><span class="label">Color:</span><span
+                    class="value" id="d-color">Blanco</span></div>
+                <div class="cert-field"><span
+                    class="label">Conductor:</span><span class="value" id="d-driver">Marcelo Rojas Fernández</span>
+                </div>
+                <div class="cert-field"><span
+                    class="label">Licencia:</span><span class="value" id="d-license">4587412 Cat. P</span></div>
+                <div class="cert-field"><span
+                    class="label">Empresa:</span><span class="value" id="d-company">Transportes San Miguel</span>
+                </div>
+                <div class="cert-field"><span
+                    class="label">Teléfono:</span><span class="value" id="d-companyPhone">33012345</span></div>
+                <div class="cert-field"><span class="label">Fecha de
+                    lavado:</span><span class="value" id="d-washDate">04/09/2026</span></div>
+              </div>
+            </div>
+
+            <div class="cert-product">
+              <div class="cert-product-label">
+                <svg class="cert-product-icon" viewBox="0 0 24 24">
+                  <path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2z" />
+                </svg>
+                Producto utilizado
+              </div>
+              <p class="cert-product-text" id="d-product">Hipoclorito de sodio al 5%, detergente desengrasante
+                industrial biodegradable y agua a presión. Enjuague final con agua potable clorada.</p>
+            </div>
+
+            <div class="cert-signature-row">
+              <div class="cert-signature">
+                <div class="cert-sign-line"></div>
+                <div class="cert-signer-name" id="d-signerName">Jhonny Martínez</div>
+                <div class="cert-signer-phone">Tel: <span id="d-signerPhone">70012345</span></div>
+              </div>
+            </div>
+
+            <div class="cert-footer">Santa Cruz - Bolivia
+              <span class="cert-footer-deco" aria-hidden="true"></span>
+            </div>
+          </div>
+          <div class="cert-page-number">1 de 1</div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Modal: elegir formato antes de compartir por WhatsApp -->
+  <div class="share-modal" id="shareModal" hidden>
+    <div class="share-card" role="dialog" aria-modal="true" aria-labelledby="shareModalTitle">
+      <h3 id="shareModalTitle">¿Cómo querés enviar el certificado?</h3>
+      <p>Elegí el formato para compartir por WhatsApp.</p>
+      <div class="share-options">
+        <button class="btn btn-primary" id="shareAsPdf">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+            <path d="M14 2v6h6" />
+          </svg>
+          Enviar como PDF
+        </button>
+        <button class="btn btn-secondary" id="shareAsImg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" />
+            <circle cx="9" cy="9" r="2" />
+            <path d="m21 15-4.5-4.5L7 20" />
+          </svg>
+          Enviar como Imagen
+        </button>
+      </div>
+      <button class="share-cancel" id="shareCancel">Cancelar</button>
+    </div>
+  </div>
+
+  <style>
+    /* ============================================================
+   2. DISEÑO DEL CERTIFICADO (colores fijos, tamaño fluido)
+   El certificado tiene un ancho de diseño de referencia de 1000px
+   (100% del contenedor, con tope en max-width), y su tipografía usa
+   clamp(mínimo, X-cqw, máximo): "cqw" es 1% del ancho del contenedor
+   con container-type:inline-size más cercano (.cert-stage), así que
+   todo el certificado escala como una sola unidad -sin overflow ni
+   scroll horizontal- tanto en la columna angosta del formulario como
+   a pantalla completa. La exportación a imagen (html2canvas) clona el
+   certificado dentro de un contenedor fijo de 1000px, así que ahí las
+   "cqw" siempre resuelven al tamaño máximo (alta resolución).
+   ============================================================ */
+    .certificate {
+      --paper: #ffffff;
+      --ink: #1a1a1a;
+      --blue-dark: #0d2b6b;
+      --blue-mid: #1a3d8f;
+      --red: #c0281c;
+      --label-blue: #1a3d8f;
+
+      width: 100%;
+      max-width: 850px;
+      margin: 0 auto;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Barlow', system-ui, sans-serif;
+      border: 1px solid #c9d2e4;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      padding-bottom: clamp(6px, 1cqw, 10px);
+    }
+
+    /* --- cabecera --- */
+    .cert-header {
+      display: flex;
+      align-items: stretch;
+      padding-top: clamp(6px, 1cqw, 10px);
+    }
+
+    /* Encabezado izquierdo en COLUMNA: rubro, logo, nombre, propietario,
+   dirección y celular, apilados y centrados horizontalmente. Todo el
+   bloque queda centrado verticalmente contra la franja azul. */
+    .cert-brand {
+      flex: 0 1 36%;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: clamp(2px, 0.5cqw, 5px);
+      padding: clamp(14px, 3cqw, 30px) clamp(10px, 2.2cqw, 22px);
+    }
+
+    .cert-brand > * {
+      margin: 0;
+      max-width: 100%;
+    }
+
+    /* Logo: cuadrado con esquinas suaves ~90-100px a tamaño de diseño/
+   exportación (clamp para no romper el escalado fluido en la vista
+   previa angosta). Borde sutil gris del tema; imagen completa con
+   object-fit: contain, sin deformarse ni recortarse. */
+    .cert-logo {
+      width: clamp(60px, 11.5cqw, 100px);
+      height: clamp(60px, 11.5cqw, 100px);
+      border-radius: 11px;
+      overflow: hidden;
+      flex-shrink: 0;
+      background: #fff;
+      border: 1.5px solid #c9d2e4;
+      /* margen superior negativo: el arco del rubro deja una "cuenca"
+         vacía debajo; se sube el logo para que quede acurrucado bajo él. */
+      margin: clamp(-24px, -3.4cqw, -14px) 0 clamp(4px, 0.8cqw, 8px);
+    }
+
+    .cert-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .cert-logo[hidden] {
+      display: none;
+    }
+
+    /* El rubro ahora se dibuja en arco sobre el logo con <textPath>. */
+    .cert-eyebrow {
+      line-height: 0;
+    }
+
+    .cert-eyebrow-arc {
+      display: block;
+      width: clamp(160px, 23cqw, 205px);
+      height: auto;
+      overflow: visible;
+    }
+
+    .cert-eyebrow-arc-text {
+      font-family: 'Barlow', Arial, Helvetica, sans-serif;
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: .3px;
+      text-transform: uppercase;
+      fill: var(--blue-dark);
+    }
+
+    .cert-business-name {
+      font-family: 'Lobster', cursive;
+      font-size: clamp(20px, 3.6cqw, 34px);
+      line-height: 1.05;
+      color: var(--blue-dark);
+    }
+
+    .cert-owner-line {
+      font-size: clamp(11px, 1.35cqw, 13px);
+      font-weight: 700;
+      color: #222;
+      line-height: 1.25;
+    }
+
+    .cert-address-line {
+      font-size: clamp(9.5px, 1.15cqw, 11.5px);
+      color: #666;
+      line-height: 1.25;
+      white-space: pre-line;
+      /* respeta los saltos de línea del textarea */
+    }
+
+    .cert-phone-line {
+      font-size: clamp(9.5px, 1.2cqw, 12px);
+      font-weight: 700;
+      color: #333;
+      line-height: 1.25;
+    }
+
+    .cert-phone-line[hidden],
+    .cert-eyebrow[hidden] {
+      display: none;
+    }
+
+    /* Columna derecha de la cabecera: fila de íconos arriba, franja
+   azul con el título abajo. Ocupa el mismo ancho que antes tenía
+   la franja azul sola (no todo el encabezado). */
+    .cert-title-col {
+      flex: 1 1 64%;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      /* baja la franja azul + fila de vehículos para que queden
+         centradas verticalmente contra el bloque izquierdo (logo/arco) */
+      padding-top: clamp(24px, 5.9cqw, 52px);
+    }
+
+    .cert-vehicle-icons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(6px, 1.4cqw, 14px);
+      padding: clamp(8px, 1.8cqw, 18px) clamp(12px, 2.6cqw, 26px);
+      /* sin caja ni fondo: la fila queda apoyada justo debajo de la franja azul */
+    }
+
+    /* Las 4 imágenes tienen proporciones distintas (volquete 1.24,
+       camioneta 1.78, furgón 1.69, tractor 1.39). Para que se vean
+       "del mismo tamaño", en fila y con separación uniforme, cada una
+       ocupa una celda flexible idéntica -flex: 1 1 0 => mismo ancho-
+       y de alto fijo; object-fit: contain escala el dibujo dentro de
+       esa celda sin deformarlo ni recortarlo y lo centra. Así las 4
+       celdas son idénticas, el gap queda parejo y la fila nunca
+       desborda, sin importar el ancho real del contenedor
+       (pantalla / PNG exportado / PDF).
+       NOTA: NO usar max-width en px/%: al topar el ancho, la imagen
+       conserva proporción y también pierde altura -> se ve "chica"
+       y desalineada respecto a las demás (bug anterior). */
+    .cert-vehicle-icons img {
+      flex: 1 1 0;
+      min-width: 0;
+      width: 100%;
+      height: clamp(34px, 7.6cqw, 72px);
+      object-fit: contain;
+      object-position: center;
+      /* colores originales del PNG, sin filtro */
+    }
+
+    .cert-title-band {
+      position: relative;
+      flex: 0 0 auto;
+      background: var(--blue-mid);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: clamp(9px, 1.6cqw, 15px) clamp(10px, 2.4cqw, 24px);
+      overflow: hidden;
+    }
+
+    .cert-title-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: clamp(18px, 3.2cqw, 32px);
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      line-height: 1.15;
+      overflow-wrap: break-word;
+    }
+
+    /* --- número de certificado --- */
+    /* Debajo del encabezado, alineado a la derecha. En ROJO, negrita y
+       grande (~24-28px a tamaño de diseño/exportación) como en la
+       referencia. El "N°" también en rojo para que lea como una sola
+       unidad. */
+    .cert-number-row {
+      text-align: right;
+      padding: 0 clamp(12px, 2.6cqw, 26px) 0;
+      /* sube la fila hasta el nivel de la línea "Cel:" del bloque
+         izquierdo; en cqw para que el desplazamiento escale igual que el
+         resto del header en pantalla, PDF e impresión. Arrastra hacia
+         arriba también el contenido que va debajo (frase, datos,
+         producto…), liberando ~41px para "Producto utilizado". */
+      margin-top: clamp(-48px, -4.4cqw, -28px);
+      font-size: clamp(14px, 2.1cqw, 21px);
+      font-weight: 700;
+      color: var(--red);
+      line-height: 1.1;
+    }
+
+    .cert-number {
+      color: var(--red);
+      font-size: clamp(18px, 3.1cqw, 28px);
+      font-weight: 800;
+      letter-spacing: .01em;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    /* --- frase de certificación --- */
+    .cert-statement {
+      margin: clamp(8px, 1.5cqw, 14px) clamp(12px, 2.6cqw, 26px) 4px;
+      font-size: clamp(12.5px, 1.7cqw, 16px);
+      font-weight: 600;
+      line-height: 1.5;
+      color: #20263a;
+    }
+
+    /* --- bloque de datos con marca de agua --- */
+    .cert-data-block {
+      position: relative;
+      margin: clamp(8px, 1.5cqw, 13px) clamp(12px, 2.6cqw, 26px) 0;
+      padding: clamp(12px, 2.6cqw, 24px) clamp(10px, 2cqw, 20px);
+      border: 1px solid #e3e8f2;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .cert-watermark {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-evenly;
+      /* apenas perceptible: es una marca de fondo, no debe competir con los datos */
+      opacity: .07;
+      pointer-events: none;
+    }
+
+    .cert-watermark img {
+      height: 78%;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .cert-data-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr;
+      column-gap: clamp(14px, 3.6cqw, 36px);
+      /* sangría suave: mueve todo el bloque de datos un poco a la derecha,
+         sin centrarlo. El borde de la caja y la marca de agua no se mueven. */
+      padding-left: clamp(16px, 3.2cqw, 30px);
+    }
+
+    .cert-field {
+      font-size: clamp(14px, 2.4cqw, 20px);
+      padding: clamp(6px, 1.5cqw, 13px) 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 6px;
+      /* etiquetas y valores en mayúsculas, estilo certificado oficial;
+         solo visual (dígitos/fechas no se ven afectados) */
+      text-transform: uppercase;
+    }
+
+    .cert-field .label {
+      color: var(--label-blue);
+      font-weight: 700;
+      flex-shrink: 0;
+      min-width: clamp(100px, 17cqw, 165px);
+    }
+
+    .cert-field .value {
+      color: #151515;
+      font-weight: 500;
+    }
+
+    /* --- producto utilizado --- */
+    .cert-product {
+      margin: clamp(10px, 2.2cqw, 20px) clamp(12px, 2.6cqw, 26px) 0;
+    }
+
+    .cert-product-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: clamp(12px, 1.6cqw, 16px);
+      letter-spacing: .06em;
+      color: var(--blue-mid);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cert-product-icon {
+      width: clamp(12px, 1.7cqw, 17px);
+      height: clamp(12px, 1.7cqw, 17px);
+      fill: var(--blue-mid);
+      flex-shrink: 0;
+    }
+
+    .cert-product-text {
+      font-size: clamp(10px, 1.3cqw, 12.5px);
+      line-height: 1.45;
+      color: #2a2a2a;
+      margin: 0;
+      overflow-wrap: break-word;
+      /* un token larguísimo sin espacios (una URL) no debe desbordar */
+    }
+
+    /* --- firma --- */
+    .cert-signature-row {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      gap: clamp(20px, 4cqw, 40px);
+      margin: clamp(14px, 3cqw, 30px) 0 0;
+      padding-bottom: clamp(12px, 2.4cqw, 22px);
+    }
+
+    .cert-signature {
+      width: min(280px, 60%);
+      text-align: center;
+    }
+
+    .cert-sign-line {
+      border-top: 1.5px solid #333;
+      margin-bottom: 8px;
+    }
+
+    .cert-signer-name {
+      font-weight: 700;
+      font-size: clamp(12.5px, 1.7cqw, 16px);
+    }
+
+    .cert-signer-phone {
+      font-size: clamp(10.5px, 1.3cqw, 13px);
+      color: #666;
+      margin-top: 2px;
+    }
+
+    /* --- pie de página --- */
+    .cert-footer {
+      position: relative;
+      background: var(--blue-dark);
+      color: #fff;
+      text-align: center;
+      font-size: clamp(11px, 1.5cqw, 15px);
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: clamp(12px, 2.2cqw, 22px);
+      overflow: hidden;
+    }
+
+    /* Decoración de la esquina: mini cinta de premio con corte en V
+       (swallowtail). Todo con CSS puro -rectángulo + border-triangle-
+       porque html2canvas 1.4.1 NO rasteriza formas <path> de SVG ni
+       clip-path; los bordes CSS sí se exportan bien. */
+    .cert-footer-deco {
+      position: absolute;
+      left: clamp(14px, 2.8cqw, 26px);
+      top: 0;
+      width: clamp(15px, 2.4cqw, 22px);
+      height: clamp(24px, 4.2cqw, 36px);
+      background: var(--blue-mid);
+    }
+
+    /* pestaña trasera translúcida: efecto de cinta plegada */
+    .cert-footer-deco::before {
+      content: '';
+      position: absolute;
+      left: 46%;
+      top: 0;
+      width: 100%;
+      height: 72%;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* muesca en V en el extremo inferior (swallowtail): triángulo del
+       color del fondo del pie que "muerde" el borde inferior de la cinta */
+    .cert-footer-deco::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 0;
+      height: 0;
+      border-left: clamp(7px, 1.2cqw, 11px) solid transparent;
+      border-right: clamp(7px, 1.2cqw, 11px) solid transparent;
+      border-bottom: clamp(5px, 0.9cqw, 8px) solid var(--blue-dark);
+    }
+
+    /* ============================================================
+   3. IMPRESIÓN — solo se imprime el certificado
+   ============================================================ */
+    @media print {
+      @page {
+        size: letter portrait;
+        margin: 10mm;
+      }
+
+      body * {
+        visibility: hidden;
+      }
+
+      /* El formulario y la barra superior salen del flujo por completo:
+         si quedan como "visibility:hidden" siguen ocupando alto y generan
+         una 2ª hoja en blanco cuando el textarea de producto crece. */
+      .topbar,
+      .form-panel {
+        display: none;
+      }
+
+      .app-grid {
+        display: block;
+        padding: 0;
+        margin: 0;
+      }
+
+      .cert-stage,
+      .cert-stage * {
+        visibility: visible;
+        /* forzar que el navegador imprima los fondos de color
+           (franjas azules, cinta, recuadros) y no solo texto en negro */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .cert-stage {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+      }
+
+      .cert-viewport {
+        overflow: visible;
+      }
+
+      .certificate {
+        width: 100%;
+        max-width: 100%;
+        border: none;
+        box-shadow: none;
+      }
+
+      .cert-page-number {
+        display: block;
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        font-size: 9px;
+        color: #888;
+        font-family: 'Barlow', system-ui, sans-serif;
+      }
+    }
+  </style>
+
+  <script src="datos-negocio.js"></script>
+  <script>
+    /* ============================================================
+       4. DATOS FIJOS DEL NEGOCIO (solo lectura)
+       Se editan únicamente en datos-negocio.js. No hay formulario ni
+       inputs para estos datos: el certificado los toma directamente
+       de ahí (nombre, rubro, propietario, dirección, teléfono, logo).
+       ============================================================ */
+    const PREDEFINIDOS = typeof DATOS_NEGOCIO_PREDEFINIDOS !== 'undefined' ? DATOS_NEGOCIO_PREDEFINIDOS : {};
+    const business = {
+      tagline: PREDEFINIDOS.rubro || '',
+      businessName: PREDEFINIDOS.nombre || '',
+      ownerName: PREDEFINIDOS.propietario || '',
+      address: PREDEFINIDOS.direccion || '',
+      businessPhone: PREDEFINIDOS.telefono || '',
+      logoDataUrl: PREDEFINIDOS.logo || ''
+    };
+
+    /* ============================================================
+       5. ESTADO Y PERSISTENCIA (localStorage)
+       - "jomarCert.current": datos del certificado actual (se limpian
+         con el botón "Nuevo certificado")
+       ============================================================ */
+    const CURRENT_KEY = 'jomarCert.current';
+    /* Contador del N° de certificado, aparte del blob del formulario.
+       { year, seq } = último correlativo USADO. Se reinicia en 001 al
+       cambiar de año (el sufijo "/AAAA" acota la serie a ese año).
+       Prototipo: vive solo en este navegador, sin sincronización. */
+    const LASTNUM_KEY = 'jomarCert.lastNumber';
+
+    const pad3 = n => String(n).padStart(3, '0');            // 1→001, 10→010, 100→100
+    const formatCertNumber = (seq, year) => pad3(seq) + '/' + year;
+
+    function peekNextCertNumber() {
+      const year = new Date().getFullYear();
+      let last = null;
+      try { last = JSON.parse(localStorage.getItem(LASTNUM_KEY) || 'null'); } catch (e) { /* ignore */ }
+      const seq = (last && last.year === year) ? last.seq + 1 : 1;   // año nuevo → 001
+      return { text: formatCertNumber(seq, year), year, seq };
+    }
+
+    function setLastCertNumber(year, seq) {
+      try { localStorage.setItem(LASTNUM_KEY, JSON.stringify({ year, seq })); } catch (e) { /* lleno/bloqueado */ }
+    }
+
+    // interpreta "NNN/AAAA" para que el contador siga una corrección manual
+    function parseCertNumber(str) {
+      const m = String(str).trim().match(/^(\d{1,6})\s*\/\s*(\d{4})$/);
+      return m ? { seq: +m[1], year: +m[2] } : null;
+    }
+
+    const defaultCurrent = {
+      certNumber: '',
+      washDate: new Date().toISOString().slice(0, 10),
+      statement: 'Nos permitimos certificar el lavado de tanque interior y desinfección',
+      plate: '1234-ABC',
+      brand: 'Volvo FH 440',
+      color: 'Blanco',
+      license: '4587412 Cat. P',
+      driver: 'Marcelo Rojas Fernández',
+      company: 'Transportes San Miguel',
+      companyPhone: '33012345',
+      product: 'Hipoclorito de sodio al 5%, detergente desengrasante industrial biodegradable y agua a presión. Enjuague final con agua potable clorada.',
+      signerName: 'Jhonny Martínez',
+      signerPhone: '70012345'
+    };
+
+    function loadJSON(key, fallback) {
+      try {
+        const raw = localStorage.getItem(key);
+        return raw ? Object.assign({}, fallback, JSON.parse(raw)) : Object.assign({}, fallback);
+      } catch (e) { return Object.assign({}, fallback); }
+    }
+    function saveJSON(key, obj) {
+      try { localStorage.setItem(key, JSON.stringify(obj)); } catch (e) { /* almacenamiento lleno o bloqueado */ }
+    }
+
+    let current = loadJSON(CURRENT_KEY, defaultCurrent);
+
+    /* ============================================================
+       6. FORMULARIO ↔ ESTADO (solo los datos del certificado)
+       ============================================================ */
+    const currentFields = ['certNumber', 'washDate', 'statement', 'plate', 'brand', 'color', 'license', 'driver', 'company', 'companyPhone', 'product', 'signerName', 'signerPhone'];
+
+    /* --- "Producto utilizado": el textarea crece con el contenido y un
+       contador avisa al acercarse al tope de 900 caracteres (límite que
+       garantiza que el certificado siga entrando en 1 hoja Carta). --- */
+    const PRODUCT_MAX = 900;
+    const productEl = document.getElementById('f-product');
+    const productCountEl = document.getElementById('productCount');
+
+    function autoGrow(el) {
+      el.style.height = 'auto';
+      // con box-sizing: border-box hay que sumar el borde vertical, si no
+      // queda un scroll interno de ~2px
+      const cs = getComputedStyle(el);
+      const border = parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth);
+      el.style.height = (el.scrollHeight + border) + 'px';
+    }
+
+    function updateProductUI() {
+      autoGrow(productEl);
+      const n = productEl.value.length;
+      productCountEl.textContent = n + ' / ' + PRODUCT_MAX;
+      productCountEl.classList.toggle('warn', n >= 750);
+    }
+
+    function fillFormFromState() {
+      currentFields.forEach(k => { document.getElementById('f-' + k).value = current[k] || ''; });
+      updateProductUI();
+    }
+
+    currentFields.forEach(k => {
+      document.getElementById('f-' + k).addEventListener('input', e => {
+        current[k] = e.target.value;
+        saveJSON(CURRENT_KEY, current);
+        if (k === 'product') updateProductUI();
+        // si el N° editado a mano parsea como NNN/AAAA, el contador lo sigue
+        if (k === 'certNumber') {
+          const p = parseCertNumber(e.target.value);
+          if (p) setLastCertNumber(p.year, p.seq);
+        }
+        renderCertificate();
+      });
+    });
+
+    /* ============================================================
+       7. RENDER DEL CERTIFICADO
+       ============================================================ */
+    function formatDate(iso) {
+      if (!iso) return '';
+      const [y, m, d] = iso.split('-');
+      if (!y || !m || !d) return iso;
+      return `${d}/${m}/${y}`;
+    }
+
+    function renderCertificate() {
+      const eyebrowEl = document.getElementById('certEyebrow');
+      document.getElementById('certEyebrowText').textContent = (business.tagline || '').toUpperCase();
+      eyebrowEl.hidden = !business.tagline;
+
+      document.getElementById('certBusinessName').textContent = business.businessName || 'Tu Negocio';
+      document.getElementById('certOwnerName').textContent = business.ownerName || '';
+      document.getElementById('certAddressLine').textContent = business.address || '';
+
+      const phoneEl = document.getElementById('certPhoneLine');
+      phoneEl.textContent = business.businessPhone ? 'Cel: ' + business.businessPhone : '';
+      phoneEl.hidden = !business.businessPhone;
+
+      // Logo: si datos-negocio.js define uno (data URL), se usa ese;
+      // si no, el logo.png incluido en el proyecto.
+      document.getElementById('certLogoImg').src = business.logoDataUrl || 'logo.png';
+
+      document.getElementById('certNumber').textContent = current.certNumber || '';
+      document.getElementById('certStatement').textContent = current.statement || '';
+      document.getElementById('d-plate').textContent = current.plate || '';
+      document.getElementById('d-brand').textContent = current.brand || '';
+      document.getElementById('d-color').textContent = current.color || '';
+      document.getElementById('d-driver').textContent = current.driver || '';
+      document.getElementById('d-license').textContent = current.license || '';
+      document.getElementById('d-company').textContent = current.company || '';
+      document.getElementById('d-companyPhone').textContent = current.companyPhone || '';
+      document.getElementById('d-washDate').textContent = formatDate(current.washDate);
+      document.getElementById('d-product').textContent = current.product || '';
+      document.getElementById('d-signerName').textContent = current.signerName || '';
+      document.getElementById('d-signerPhone').textContent = current.signerPhone || '';
+    }
+
+    /* ============================================================
+       8. EXPORTAR A IMAGEN (siempre a resolución alta, clonando el
+       certificado a su tamaño natural de 1000px fuera de pantalla)
+       ============================================================ */
+
+    /* Cuando la página corre dentro del visor de Artifacts, un enlace
+       <a download> no hace nada (el iframe no tiene permiso de descarga):
+       hay que ofrecer el archivo con la capacidad "downloads" del host.
+       Si la página corre como archivo local (doble clic, XAMPP, etc.),
+       window.claude no existe y se usa el <a download> de siempre. */
+    let downloadsCap = null;
+    if (window.claude && typeof window.claude.use === 'function') {
+      window.claude.use('downloads').then(ns => { downloadsCap = ns; }).catch(() => { });
+    }
+
+    async function saveFile(filename, blob) {
+      if (downloadsCap) {
+        try {
+          await downloadsCap.save({ filename, data: blob });
+          return;
+        } catch (err) {
+          if (err && err.code === 'declined') return; // el usuario canceló, no insistir
+          // cualquier otro error: probamos el respaldo clásico por si acaso
+        }
+      }
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = url;
+      link.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+    }
+
+    /* El certificado incluye <img> reales (logo del negocio, íconos de la
+       franja azul y marca de agua). cloneNode(true) copia las etiquetas
+       <img> pero cada una debe volver a decodificar su imagen: si
+       html2canvas dispara el snapshot antes de que terminen de cargar,
+       esas imágenes salen en blanco o rotas en el PNG exportado. */
+    function waitForImages(root) {
+      const imgs = Array.from(root.querySelectorAll('img'));
+      return Promise.all(imgs.map(img => {
+        if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+        return new Promise(resolve => {
+          img.addEventListener('load', resolve, { once: true });
+          img.addEventListener('error', resolve, { once: true });
+        });
+      }));
+    }
+
+    async function renderCertificateToCanvas() {
+      const original = document.getElementById('certificate');
+      const clone = original.cloneNode(true);
+
+      const holder = document.createElement('div');
+      holder.style.position = 'fixed';
+      holder.style.left = '-10000px';
+      holder.style.top = '0';
+      holder.style.width = '850px';
+      // Ancla el contexto de unidades "cqw" del clon a 850px exactos (el
+      // mismo max-width de .certificate), para que el PNG exportado
+      // siempre salga a la resolución máxima de diseño sin importar qué
+      // tan chico se vea el certificado en pantalla.
+      holder.style.containerType = 'inline-size';
+      holder.appendChild(clone);
+      document.body.appendChild(holder);
+
+      await waitForImages(holder);
+      const canvas = await html2canvas(clone, { scale: 2, backgroundColor: '#ffffff', useCORS: true, allowTaint: true });
+      document.body.removeChild(holder);
+      return canvas;
+    }
+
+    function certFileName() {
+      const num = (current.certNumber || 'certificado').replace(/[^\w-]+/g, '_');
+      return `certificado_${num}.png`;
+    }
+
+    function certFileNamePdf() {
+      const plate = (current.plate || 'certificado').replace(/[^\w-]+/g, '_');
+      return `certificado_${plate}.pdf`;
+    }
+
+    /* Genera el PDF (carta vertical, 1 hoja) a partir del mismo canvas
+       que usa la imagen, y lo devuelve como Blob. Lo usan el botón
+       "Descargar PDF" y la opción "Enviar como PDF" del compartir. */
+    async function buildCertPdfBlob() {
+      const canvas = await renderCertificateToCanvas();
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const margin = 10;
+      // El certificado se ajusta al ancho de página; si el texto de
+      // "Producto utilizado" lo hace muy alto, se limita también al alto
+      // disponible (reduciendo el ancho a la par) para que SIEMPRE entre
+      // completo en 1 hoja Carta, sin recortar la firma ni el pie.
+      const maxHeight = pageHeight - margin * 2;
+      let imgWidth = pageWidth - margin * 2;
+      let imgHeight = (canvas.height * imgWidth) / canvas.width;
+      if (imgHeight > maxHeight) {
+        imgHeight = maxHeight;
+        imgWidth = (canvas.width * imgHeight) / canvas.height;
+      }
+      const x = (pageWidth - imgWidth) / 2;
+      const y = Math.max(margin, (pageHeight - imgHeight) / 2);
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', x, y, imgWidth, imgHeight);
+      pdf.setFontSize(8);
+      pdf.setTextColor(140);
+      pdf.text('1 de 1', pageWidth - margin, pageHeight - 4, { align: 'right' });
+      return pdf.output('blob');
+    }
+
+    document.getElementById('btnDownload').addEventListener('click', async () => {
+      const btn = document.getElementById('btnDownload');
+      btn.disabled = true; btn.style.opacity = '.7';
+      try {
+        const canvas = await renderCertificateToCanvas();
+        const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+        await saveFile(certFileName(), blob);
+      } finally {
+        btn.disabled = false; btn.style.opacity = '';
+      }
+    });
+
+    /* ---------- Descargar PDF (carta vertical, mismo canvas que la imagen) ---------- */
+    document.getElementById('btnDownloadPdf').addEventListener('click', async () => {
+      const btn = document.getElementById('btnDownloadPdf');
+      btn.disabled = true; btn.style.opacity = '.7';
+      try {
+        await saveFile(certFileNamePdf(), await buildCertPdfBlob());
+      } finally {
+        btn.disabled = false; btn.style.opacity = '';
+      }
+    });
+
+    /* ============================================================
+       Compartir por WhatsApp — primero se elige el formato (PDF o
+       imagen) en un modal, y después se comparte ese archivo.
+       ============================================================ */
+    const shareModal = document.getElementById('shareModal');
+
+    function openShareModal() { shareModal.hidden = false; }
+    function closeShareModal() { shareModal.hidden = true; }
+
+    document.getElementById('btnShare').addEventListener('click', openShareModal);
+    document.getElementById('shareCancel').addEventListener('click', closeShareModal);
+    shareModal.addEventListener('click', e => { if (e.target === shareModal) closeShareModal(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !shareModal.hidden) closeShareModal();
+    });
+
+    document.getElementById('shareAsPdf').addEventListener('click', () => shareCertificate('pdf'));
+    document.getElementById('shareAsImg').addEventListener('click', () => shareCertificate('image'));
+
+    async function shareCertificate(format) {
+      const pdfBtn = document.getElementById('shareAsPdf');
+      const imgBtn = document.getElementById('shareAsImg');
+      pdfBtn.disabled = imgBtn.disabled = true;
+      pdfBtn.style.opacity = imgBtn.style.opacity = '.7';
+      try {
+        let blob, filename, mime;
+        if (format === 'pdf') {
+          blob = await buildCertPdfBlob();
+          filename = certFileNamePdf();
+          mime = 'application/pdf';
+        } else {
+          const canvas = await renderCertificateToCanvas();
+          blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
+          filename = certFileName();
+          mime = 'image/png';
+        }
+        closeShareModal();
+
+        const file = new File([blob], filename, { type: mime });
+        const shareText = `Certificado de lavado N° ${current.certNumber || ''} - ${business.businessName || ''}`;
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          try {
+            await navigator.share({ files: [file], text: shareText, title: 'Certificado de lavado' });
+            return;
+          } catch (err) {
+            if (err && err.name === 'AbortError') return;
+            /* si falla el share nativo, seguimos con el respaldo abajo */
+          }
+        }
+
+        // Respaldo: descarga el archivo y abre WhatsApp para adjuntarlo manualmente
+        await saveFile(filename, blob);
+        alert(format === 'pdf'
+          ? 'Se descargó el PDF del certificado. Ábrelo desde WhatsApp para enviarlo como adjunto.'
+          : 'Se descargó la imagen del certificado. Ábrela desde WhatsApp para enviarla como adjunto.');
+        const phoneDigits = (current.companyPhone || business.businessPhone || '').replace(/\D/g, '');
+        const waUrl = phoneDigits
+          ? `https://wa.me/${phoneDigits}?text=${encodeURIComponent(shareText)}`
+          : `https://wa.me/?text=${encodeURIComponent(shareText)}`;
+        window.open(waUrl, '_blank');
+      } finally {
+        pdfBtn.disabled = imgBtn.disabled = false;
+        pdfBtn.style.opacity = imgBtn.style.opacity = '';
+      }
+    }
+
+    /* ---------- Nuevo certificado: limpia solo datos del vehículo/cliente ---------- */
+    document.getElementById('btnNew').addEventListener('click', () => {
+      if (!confirm('¿Limpiar los datos del vehículo, conductor y firma para un nuevo certificado?')) return;
+      const next = peekNextCertNumber();
+      current = Object.assign({}, defaultCurrent, {
+        certNumber: next.text, washDate: new Date().toISOString().slice(0, 10),
+        plate: '', brand: '', color: '', license: '', driver: '',
+        company: '', companyPhone: '', product: '', signerName: '', signerPhone: ''
+      });
+      setLastCertNumber(next.year, next.seq);   // "reserva" ese número
+      saveJSON(CURRENT_KEY, current);
+      fillFormFromState();
+      renderCertificate();
+      // queda autocompletado y seleccionado: se corrige de una o se tabula
+      const numEl = document.getElementById('f-certNumber');
+      numEl.focus();
+      numEl.select(
