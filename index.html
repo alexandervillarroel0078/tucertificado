@@ -1120,9 +1120,9 @@
     }
 
     .cert-watermark img {
-      /* más grande que la caja: se lee como sello y el sobrante lo recorta
-         .cert-data-block (overflow:hidden) */
-      height: 128%;
+      /* 90% del alto de la caja: el logo (apaisado) entra completo, con
+         margen arriba y abajo, sin recortarse por el overflow:hidden. */
+      height: 90%;
       width: auto;
       object-fit: contain;
     }
