@@ -146,14 +146,23 @@
       border-color: rgba(255, 255, 255, 0.55);
     }
 
+    /* La grilla arranca con la vista previa OCULTA: segunda columna a 0fr
+   y el formulario centrado con un ancho cómodo. El botón "Vista previa"
+   agrega .preview-on y la grilla se abre a 2 columnas (transición suave
+   sobre grid-template-columns). */
     .app-grid {
       display: grid;
-      grid-template-columns: minmax(300px, 400px) 1fr;
+      grid-template-columns: 1fr 0fr;
       gap: 20px;
       max-width: 1400px;
       margin: 0 auto;
       padding: 20px;
       align-items: start;
+      transition: grid-template-columns .4s ease;
+    }
+
+    .app-grid.preview-on {
+      grid-template-columns: minmax(300px, 400px) 1fr;
     }
 
     /* Un item de grid no se encoge más allá del ancho mínimo de su
@@ -166,10 +175,40 @@
     }
 
     @media (max-width: 900px) {
-      .app-grid {
+
+      .app-grid,
+      .app-grid.preview-on {
         grid-template-columns: 1fr;
         padding: 12px;
         gap: 16px;
+      }
+
+      /* En celular el formulario siempre ocupa todo el ancho y la vista
+         previa se apila debajo (aparece con un fundido al activarla). */
+      .form-panel,
+      .app-grid.preview-on .form-panel {
+        max-width: none;
+      }
+
+      .preview-panel {
+        display: none;
+      }
+
+      .app-grid.preview-on .preview-panel {
+        display: flex;
+        animation: previewFadeIn .35s ease;
+      }
+    }
+
+    @keyframes previewFadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
       }
     }
 
@@ -180,6 +219,17 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow: hidden;
+      /* con la vista previa oculta el formulario queda centrado y con un
+         ancho de lectura cómodo; al abrir la previa la columna de la
+         grilla manda y este tope deja de aplicar. */
+      width: 100%;
+      max-width: 640px;
+      margin-inline: auto;
+      transition: max-width .4s ease;
+    }
+
+    .app-grid.preview-on .form-panel {
+      max-width: none;
     }
 
     .form-scroll {
@@ -328,6 +378,29 @@
     .preview-panel {
       display: flex;
       flex-direction: column;
+      /* oculto por defecto: la columna de la grilla está a 0fr y el
+         contenido se recorta/desvanece. .preview-on lo revela. */
+      overflow: hidden;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .3s ease;
+    }
+
+    .app-grid.preview-on .preview-panel {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    /* ---------- Botón "Vista previa" (interruptor) al pie del formulario ---------- */
+    .preview-toggle-wrap {
+      padding: 14px 0 4px;
+    }
+
+    #btnTogglePreview {
+      width: 100%;
+      justify-content: center;
+      font-size: 13px;
+      padding: 10px;
     }
 
     .btn {
@@ -556,8 +629,8 @@
           </div>
           <div class="field">
             <label for="f-statement">Frase de certificación</label>
-            <input type="text" id="f-statement"
-              placeholder="Ej: Nos permitimos certificar el lavado de tanque interior y desinfección">
+            <textarea id="f-statement" rows="2"
+              placeholder="Ej: Nos permitimos certificar el lavado de tanque interior y desinfección"></textarea>
           </div>
         </fieldset>
 
@@ -618,6 +691,18 @@
             </div>
           </div>
         </fieldset>
+
+        <!-- Interruptor: muestra/oculta el certificado (vista previa). Por
+             defecto oculto y el formulario centrado. -->
+        <div class="preview-toggle-wrap">
+          <button type="button" class="btn btn-secondary" id="btnTogglePreview" aria-pressed="false">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            Vista previa
+          </button>
+        </div>
 
       </div>
     </section>
@@ -1208,6 +1293,16 @@
         margin: 0;
       }
 
+      /* Aunque la vista previa esté oculta en pantalla (0fr / opacity:0 /
+         display:none en celular), al imprimir SIEMPRE debe salir el
+         certificado. */
+      .preview-panel {
+        display: flex !important;
+        opacity: 1 !important;
+        overflow: visible !important;
+        pointer-events: auto !important;
+      }
+
       .cert-stage,
       .cert-stage * {
         visibility: visible;
@@ -1334,12 +1429,19 @@
        ============================================================ */
     const currentFields = ['certNumber', 'washDate', 'statement', 'plate', 'brand', 'color', 'license', 'driver', 'company', 'companyPhone', 'product', 'signerName', 'signerPhone'];
 
+    /* Campos que se pasan a MAYÚSCULAS mientras se escriben (y al cargar).
+       Teléfonos quedan fuera: son números. */
+    const UPPER_FIELDS = ['plate', 'brand', 'color', 'driver', 'license', 'company'];
+
     /* --- "Producto utilizado": el textarea crece con el contenido y un
        contador avisa al acercarse al tope de 900 caracteres (límite que
        garantiza que el certificado siga entrando en 1 hoja Carta). --- */
     const PRODUCT_MAX = 900;
     const productEl = document.getElementById('f-product');
     const productCountEl = document.getElementById('productCount');
+    /* "Frase de certificación": mismo auto-crecimiento que "Producto
+       utilizado" (crece línea a línea, sin scroll interno, sin cortar). */
+    const statementEl = document.getElementById('f-statement');
 
     function autoGrow(el) {
       el.style.height = 'auto';
@@ -1358,15 +1460,29 @@
     }
 
     function fillFormFromState() {
+      // normaliza a mayúsculas los campos que lo requieren, para que el
+      // formulario muestre lo mismo que ya se guarda al escribir
+      UPPER_FIELDS.forEach(k => { if (current[k]) current[k] = String(current[k]).toUpperCase(); });
       currentFields.forEach(k => { document.getElementById('f-' + k).value = current[k] || ''; });
+      autoGrow(statementEl);
       updateProductUI();
     }
 
     currentFields.forEach(k => {
       document.getElementById('f-' + k).addEventListener('input', e => {
+        if (UPPER_FIELDS.includes(k)) {
+          const el = e.target;
+          const upper = el.value.toUpperCase();
+          if (upper !== el.value) {
+            const start = el.selectionStart, end = el.selectionEnd;
+            el.value = upper;
+            try { el.setSelectionRange(start, end); } catch (_) { /* algunos tipos no lo soportan */ }
+          }
+        }
         current[k] = e.target.value;
         saveJSON(CURRENT_KEY, current);
         if (k === 'product') updateProductUI();
+        if (k === 'statement') autoGrow(statementEl);
         // si el N° editado a mano parsea como NNN/AAAA, el contador lo sigue
         if (k === 'certNumber') {
           const p = parseCertNumber(e.target.value);
@@ -1638,6 +1754,30 @@
       numEl.focus();
       numEl.select();
     });
+
+    /* ============================================================
+       Vista previa ocultable — el certificado arranca OCULTO y el
+       formulario queda centrado. Este botón lo muestra/oculta (la
+       transición la hace el CSS sobre .app-grid.preview-on). No toca
+       el estado, el auto-guardado ni el render en tiempo real: el
+       #certificate sigue en el DOM y actualizándose aunque no se vea.
+       ============================================================ */
+    (function initPreviewToggle() {
+      const grid = document.querySelector('.app-grid');
+      const btn = document.getElementById('btnTogglePreview');
+      btn.addEventListener('click', () => {
+        const on = grid.classList.toggle('preview-on');
+        btn.classList.toggle('active', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        // en celular el certificado aparece apilado debajo: lo acercamos
+        if (on && window.matchMedia('(max-width: 900px)').matches) {
+          requestAnimationFrame(() => {
+            document.querySelector('.preview-panel')
+              .scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          });
+        }
+      });
+    })();
 
     /* ============================================================
        9. INICIO
