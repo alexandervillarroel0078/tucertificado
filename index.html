@@ -1636,4 +1636,32 @@
       // queda autocompletado y seleccionado: se corrige de una o se tabula
       const numEl = document.getElementById('f-certNumber');
       numEl.focus();
-      numEl.select(
+      numEl.select();
+    });
+
+    /* ============================================================
+       9. INICIO
+       ============================================================ */
+    (function initCertNumber() {
+      const firstRun = localStorage.getItem(CURRENT_KEY) === null;
+      let last = null;
+      try { last = JSON.parse(localStorage.getItem(LASTNUM_KEY) || 'null'); } catch (e) { /* ignore */ }
+      if (firstRun) {
+        // navegador nuevo: arranca en 001 del año actual
+        const next = peekNextCertNumber();
+        current.certNumber = next.text;
+        setLastCertNumber(next.year, next.seq);
+        saveJSON(CURRENT_KEY, current);
+      } else if (!last) {
+        // ya hay datos pero no contador: se siembra del número que haya
+        const p = parseCertNumber(current.certNumber);
+        if (p) setLastCertNumber(p.year, p.seq);
+      }
+    })();
+
+    fillFormFromState();
+    renderCertificate();
+  </script>
+</body>
+
+</html>
