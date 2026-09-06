@@ -673,23 +673,16 @@
         </fieldset>
 
         <fieldset class="field-group">
-          <legend>Producto y firma</legend>
+          <legend>Producto</legend>
           <div class="field">
             <label for="f-product">Producto utilizado</label>
             <textarea id="f-product" maxlength="900"
               placeholder="Detalle el químico y procedimiento usado"></textarea>
             <div class="char-count" id="productCount" aria-live="polite">0 / 900</div>
           </div>
-          <div class="field-row">
-            <div class="field">
-              <label for="f-signerName">Nombre de quien certifica</label>
-              <input type="text" id="f-signerName" placeholder="Ej: Jhonny Martínez">
-            </div>
-            <div class="field">
-              <label for="f-signerPhone">Teléfono de contacto</label>
-              <input type="tel" id="f-signerPhone" placeholder="Ej: 70012345">
-            </div>
-          </div>
+          <!-- La firma del certificado (imagen firma.png + nombre y teléfonos
+               fijos) ya no se edita desde el formulario: es contenido fijo,
+               ver .cert-signature en el certificado. -->
         </fieldset>
 
         <!-- Interruptor: muestra/oculta el certificado (vista previa). Por
@@ -799,10 +792,13 @@
             </div>
 
             <div class="cert-signature-row">
+              <!-- bloque de firma centrado; el espacio en blanco simétrico
+                   a los lados queda libre para el sello físico a mano -->
               <div class="cert-signature">
+                <img class="cert-sign-img" src="firma.png" alt="Firma">
                 <div class="cert-sign-line"></div>
-                <div class="cert-signer-name" id="d-signerName">Jhonny Martínez</div>
-                <div class="cert-signer-phone">Tel: <span id="d-signerPhone">70012345</span></div>
+                <div class="cert-signer-name">Ing. Miguel Ángel Martínez</div>
+                <div class="cert-signer-phone">77697408 - 63544889</div>
               </div>
             </div>
 
@@ -1183,19 +1179,32 @@
       /* un token larguísimo sin espacios (una URL) no debe desbordar */
     }
 
-    /* --- firma --- */
+    /* --- firma ---
+       Bloque centrado en el ancho del certificado: firma escaneada
+       (firma.png) sobre la raya + nombre y teléfonos fijos. El espacio
+       en blanco simétrico a los lados queda libre para el sello físico. */
     .cert-signature-row {
       display: flex;
       justify-content: center;
       align-items: flex-end;
-      gap: clamp(20px, 4cqw, 40px);
-      margin: clamp(14px, 3cqw, 30px) 0 0;
+      margin: clamp(14px, 3cqw, 30px) clamp(12px, 2.6cqw, 26px) 0;
       padding-bottom: clamp(12px, 2.4cqw, 22px);
     }
 
     .cert-signature {
-      width: min(280px, 60%);
+      width: min(260px, 46%);
       text-align: center;
+    }
+
+    /* Firma escaneada: PNG con transparencia. Apoyada justo sobre la raya
+       (margen inferior negativo) para que el trazo la cruce como una
+       firma real. Sin fondo: el papel del certificado queda a la vista. */
+    .cert-sign-img {
+      display: block;
+      width: clamp(110px, 20cqw, 175px);
+      height: auto;
+      margin: 0 auto clamp(-8px, -1cqw, -4px);
+      background: transparent;
     }
 
     .cert-sign-line {
@@ -1407,9 +1416,7 @@
       driver: 'Marcelo Rojas Fernández',
       company: 'Transportes San Miguel',
       companyPhone: '33012345',
-      product: 'Hipoclorito de sodio al 5%, detergente desengrasante industrial biodegradable y agua a presión. Enjuague final con agua potable clorada.',
-      signerName: 'Jhonny Martínez',
-      signerPhone: '70012345'
+      product: 'Hipoclorito de sodio al 5%, detergente desengrasante industrial biodegradable y agua a presión. Enjuague final con agua potable clorada.'
     };
 
     function loadJSON(key, fallback) {
@@ -1427,7 +1434,7 @@
     /* ============================================================
        6. FORMULARIO ↔ ESTADO (solo los datos del certificado)
        ============================================================ */
-    const currentFields = ['certNumber', 'washDate', 'statement', 'plate', 'brand', 'color', 'license', 'driver', 'company', 'companyPhone', 'product', 'signerName', 'signerPhone'];
+    const currentFields = ['certNumber', 'washDate', 'statement', 'plate', 'brand', 'color', 'license', 'driver', 'company', 'companyPhone', 'product'];
 
     /* Campos que se pasan a MAYÚSCULAS mientras se escriben (y al cargar).
        Teléfonos quedan fuera: son números. */
@@ -1530,8 +1537,8 @@
       document.getElementById('d-companyPhone').textContent = current.companyPhone || '';
       document.getElementById('d-washDate').textContent = formatDate(current.washDate);
       document.getElementById('d-product').textContent = current.product || '';
-      document.getElementById('d-signerName').textContent = current.signerName || '';
-      document.getElementById('d-signerPhone').textContent = current.signerPhone || '';
+      // La firma (imagen + nombre + teléfonos) es contenido fijo del
+      // certificado: no se renderiza desde el estado.
     }
 
     /* ============================================================
@@ -1768,12 +1775,12 @@
 
     /* ---------- Nuevo certificado: limpia solo datos del vehículo/cliente ---------- */
     document.getElementById('btnNew').addEventListener('click', () => {
-      if (!confirm('¿Limpiar los datos del vehículo, conductor y firma para un nuevo certificado?')) return;
+      if (!confirm('¿Limpiar los datos del vehículo y conductor para un nuevo certificado?')) return;
       const next = peekNextCertNumber();
       current = Object.assign({}, defaultCurrent, {
         certNumber: next.text, washDate: new Date().toISOString().slice(0, 10),
         plate: '', brand: '', color: '', license: '', driver: '',
-        company: '', companyPhone: '', product: '', signerName: '', signerPhone: ''
+        company: '', companyPhone: '', product: ''
       });
       setLastCertNumber(next.year, next.seq);   // "reserva" ese número
       saveJSON(CURRENT_KEY, current);
