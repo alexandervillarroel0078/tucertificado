@@ -148,8 +148,9 @@
 
     /* La grilla arranca con la vista previa OCULTA: segunda columna a 0fr
    y el formulario centrado con un ancho cómodo. El botón "Vista previa"
-   agrega .preview-on y la grilla se abre a 2 columnas (transición suave
-   sobre grid-template-columns). */
+   agrega .preview-on y la grilla se abre a 2 columnas. El cambio de
+   columnas es instantáneo (no se puede transicionar entre 1fr y minmax();
+   la suavidad la aporta el fade+slide de .preview-panel). */
     .app-grid {
       display: grid;
       grid-template-columns: 1fr 0fr;
@@ -158,7 +159,6 @@
       margin: 0 auto;
       padding: 20px;
       align-items: start;
-      transition: grid-template-columns .4s ease;
     }
 
     .app-grid.preview-on {
@@ -386,17 +386,19 @@
       overflow: hidden;
       opacity: 0;
       max-height: 0;
+      transform: translateX(14px);
       pointer-events: none;
       /* al ocultar, el colapso de alto espera a que termine el slide+fade */
-      transition: opacity .3s ease, max-height 0s linear .4s;
+      transition: opacity .3s ease, transform .3s ease, max-height 0s linear .3s;
     }
 
     .app-grid.preview-on .preview-panel {
       opacity: 1;
       max-height: none;
+      transform: none;
       pointer-events: auto;
       /* al mostrar, el alto vuelve de inmediato para que el contenido exista */
-      transition: opacity .3s ease, max-height 0s;
+      transition: opacity .3s ease, transform .3s ease, max-height 0s;
     }
 
     /* ---------- Botón "Vista previa" (interruptor) al pie del formulario ---------- */
@@ -763,8 +765,7 @@
 
             <div class="cert-data-block">
               <div class="cert-watermark" aria-hidden="true">
-                <img src="certificado-imagenes/marca-agua/tractor.png" alt="">
-                <img src="certificado-imagenes/marca-agua/camion.png" alt="">
+                <img src="Logo-Fondo-gris.png" alt="">
               </div>
               <div class="cert-data-grid">
                 <div class="cert-field"><span class="label">Placa:</span><span
@@ -874,7 +875,9 @@
       background: var(--paper);
       color: var(--ink);
       font-family: 'Barlow', system-ui, sans-serif;
-      border: 1px solid #c9d2e4;
+      /* marco tipo diploma: contorno azul del header que encierra todo el
+         documento de punta a punta (también se imprime, ver @media print) */
+      border: 2px solid var(--blue-mid);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
       padding-bottom: clamp(6px, 1cqw, 10px);
     }
@@ -1108,14 +1111,18 @@
       inset: 0;
       display: flex;
       align-items: center;
-      justify-content: space-evenly;
-      /* apenas perceptible: es una marca de fondo, no debe competir con los datos */
-      opacity: .07;
+      justify-content: center;
+      /* apenas perceptible: es una marca de fondo (logo del negocio), no
+         debe competir con los datos. El logo tiene más peso visual que la
+         silueta anterior, por eso un pelo menos de opacidad. */
+      opacity: .06;
       pointer-events: none;
     }
 
     .cert-watermark img {
-      height: 78%;
+      /* más grande que la caja: se lee como sello y el sobrante lo recorta
+         .cert-data-block (overflow:hidden) */
+      height: 128%;
       width: auto;
       object-fit: contain;
     }
@@ -1346,7 +1353,8 @@
       .certificate {
         width: 100%;
         max-width: 100%;
-        border: none;
+        /* el marco de diploma sí se imprime */
+        border: 2px solid var(--blue-mid);
         box-shadow: none;
       }
 
