@@ -378,17 +378,25 @@
     .preview-panel {
       display: flex;
       flex-direction: column;
-      /* oculto por defecto: la columna de la grilla está a 0fr y el
-         contenido se recorta/desvanece. .preview-on lo revela. */
+      /* Oculto por defecto: la columna de la grilla está a 0fr. Además
+         max-height:0 para que el panel NO aporte alto: sin esto el
+         certificado se aplasta a ~0px de ancho y crece a miles de px de
+         alto (overflow:hidden solo recorta el pintado, no frena el alto
+         del elemento), generando scroll vertical infinito en desktop. */
       overflow: hidden;
       opacity: 0;
+      max-height: 0;
       pointer-events: none;
-      transition: opacity .3s ease;
+      /* al ocultar, el colapso de alto espera a que termine el slide+fade */
+      transition: opacity .3s ease, max-height 0s linear .4s;
     }
 
     .app-grid.preview-on .preview-panel {
       opacity: 1;
+      max-height: none;
       pointer-events: auto;
+      /* al mostrar, el alto vuelve de inmediato para que el contenido exista */
+      transition: opacity .3s ease, max-height 0s;
     }
 
     /* ---------- Botón "Vista previa" (interruptor) al pie del formulario ---------- */
@@ -710,7 +718,7 @@
             <div class="cert-header">
               <div class="cert-brand">
                 <div class="cert-eyebrow" id="certEyebrow">
-                  <svg class="cert-eyebrow-arc" viewBox="0 0 280 84"
+                  <svg class="cert-eyebrow-arc" viewBox="0 -16 280 100"
                     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
                     role="img" aria-label="Estación de servicio y lavado">
                     <defs>
