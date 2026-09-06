@@ -1535,6 +1535,31 @@
     }
 
     /* ============================================================
+       7b. VALIDACIÓN DE DATOS MÍNIMOS
+       Campos obligatorios para poder descargar/compartir. Por ahora
+       solo "Placa"; agregar más objetos { key, label } a REQUIRED_FIELDS
+       cuando se confirmen (key = sufijo del id del input y clave en
+       `current`).
+       ============================================================ */
+    const REQUIRED_FIELDS = [
+      { key: 'plate', label: 'Placa' }
+    ];
+
+    function validateRequiredFields() {
+      const missing = REQUIRED_FIELDS.filter(f => !String(current[f.key] || '').trim());
+      if (missing.length === 0) return true;
+
+      const labels = missing.map(f => f.label).join(', ');
+      alert(missing.length === 1
+        ? `Falta completar "${labels}" antes de descargar o compartir el certificado.`
+        : `Faltan datos obligatorios: ${labels}.`);
+
+      const first = document.getElementById('f-' + missing[0].key);
+      if (first) { first.focus(); if (first.select) first.select(); }
+      return false;
+    }
+
+    /* ============================================================
        8. EXPORTAR A IMAGEN (siempre a resolución alta, clonando el
        certificado a su tamaño natural de 1000px fuera de pantalla)
        ============================================================ */
@@ -1647,6 +1672,7 @@
     }
 
     document.getElementById('btnDownload').addEventListener('click', async () => {
+      if (!validateRequiredFields()) return;
       const btn = document.getElementById('btnDownload');
       btn.disabled = true; btn.style.opacity = '.7';
       try {
@@ -1660,6 +1686,7 @@
 
     /* ---------- Descargar PDF (carta vertical, mismo canvas que la imagen) ---------- */
     document.getElementById('btnDownloadPdf').addEventListener('click', async () => {
+      if (!validateRequiredFields()) return;
       const btn = document.getElementById('btnDownloadPdf');
       btn.disabled = true; btn.style.opacity = '.7';
       try {
@@ -1678,7 +1705,10 @@
     function openShareModal() { shareModal.hidden = false; }
     function closeShareModal() { shareModal.hidden = true; }
 
-    document.getElementById('btnShare').addEventListener('click', openShareModal);
+    document.getElementById('btnShare').addEventListener('click', () => {
+      if (!validateRequiredFields()) return;
+      openShareModal();
+    });
     document.getElementById('shareCancel').addEventListener('click', closeShareModal);
     shareModal.addEventListener('click', e => { if (e.target === shareModal) closeShareModal(); });
     document.addEventListener('keydown', e => {
