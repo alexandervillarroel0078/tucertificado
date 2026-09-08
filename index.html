@@ -20,6 +20,9 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <!-- jsPDF: exportación del certificado a PDF (carta horizontal) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <!-- Supabase JS v2 (UMD, expone el global `supabase`): guarda el historial
+       de certificados y calcula la numeración anual. Sin login. -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 
   <style>
     /* ============================================================
@@ -113,12 +116,6 @@
       margin: 0;
       font-weight: 700;
       letter-spacing: .2px;
-    }
-
-    .topbar .subtitle {
-      font-size: 12px;
-      opacity: .75;
-      margin-top: 1px;
     }
 
     /* Acciones movidas al topbar (antes eran una barra aparte sobre el
@@ -374,6 +371,37 @@
       box-shadow: 0 0 0 3px color-mix(in srgb, var(--input-focus) 20%, transparent);
     }
 
+    /* Campos de solo lectura: el N° de certificado (siempre), y en modo
+       "certificado recuperado" todos los campos del formulario. */
+    input[readonly],
+    textarea[readonly] {
+      background: var(--bg);
+      color: var(--text-muted);
+      cursor: default;
+    }
+
+    input[readonly]:focus,
+    textarea[readonly]:focus {
+      border-color: var(--input-border);
+      box-shadow: none;
+    }
+
+    /* Modo bloqueado (certificado generado o recuperado): el dato real se
+       ve SÓLIDO (dato firme) y los campos vacíos muestran "(sin datos)" en
+       itálica tenue, para que no se confunda con información real. */
+    body.cert-locked .form-scroll input,
+    body.cert-locked .form-scroll textarea {
+      color: var(--text);
+      -webkit-text-fill-color: var(--text);
+    }
+
+    body.cert-locked .form-scroll input::placeholder,
+    body.cert-locked .form-scroll textarea::placeholder {
+      color: var(--text-muted);
+      font-style: italic;
+      opacity: .65;
+    }
+
     /* ---------- Panel de vista previa ---------- */
     .preview-panel {
       display: flex;
@@ -576,6 +604,225 @@
       cursor: pointer;
       text-decoration: underline;
     }
+
+    /* ---------- Modal: buscar certificado anterior (hereda .share-modal / .share-card) ---------- */
+    .search-card {
+      max-width: 440px;
+      text-align: left;
+    }
+
+    .search-card h3,
+    .search-card > p {
+      text-align: left;
+    }
+
+    .search-form {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+
+    .search-form input {
+      flex: 1;
+      min-width: 0;
+      font: inherit;
+      font-size: 14.5px;
+      color: var(--text);
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      border-radius: 8px;
+      padding: 9px 10px;
+      text-transform: uppercase;
+    }
+
+    .search-form input:focus {
+      outline: none;
+      border-color: var(--input-focus);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--input-focus) 20%, transparent);
+    }
+
+    .search-form .btn {
+      flex-shrink: 0;
+    }
+
+    .search-status {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    .search-status[hidden] {
+      display: none;
+    }
+
+    .search-status.error {
+      color: var(--accent-red);
+      font-weight: 600;
+    }
+
+    .search-results {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      max-height: 46vh;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .search-results:empty {
+      display: none;
+    }
+
+    .search-result {
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .search-result-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      font-size: 13.5px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .search-result-date {
+      color: var(--text-muted);
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    .search-result-driver {
+      font-size: 12.5px;
+      color: var(--text-muted);
+      margin: 3px 0 8px;
+      text-transform: uppercase;
+    }
+
+    .search-result .btn {
+      font-size: 12px;
+      padding: 6px 12px;
+    }
+
+    /* ============================================================
+   4. AVISO "SIN CONEXIÓN" — mismo lenguaje visual que la interfaz
+   (tokens --danger-bg / --accent-red, fuente Barlow, radio del tema).
+   Se muestra cuando falla el guardado en Supabase o el cálculo del
+   número de certificado al cargar la página.
+   ============================================================ */
+    .conn-alert {
+      margin: 12px 20px 0;
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px 14px;
+      background: var(--danger-bg);
+      border: 1px solid color-mix(in srgb, var(--accent-red) 45%, transparent);
+      border-left: 4px solid var(--accent-red);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 13px;
+      line-height: 1.4;
+      animation: connAlertIn .25s ease;
+    }
+
+    .conn-alert[hidden] {
+      display: none;
+    }
+
+    @keyframes connAlertIn {
+      from {
+        opacity: 0;
+        transform: translateY(-8px);
+      }
+
+      to {
+        opacity: 1;
+        transform: none;
+      }
+    }
+
+    .conn-alert-icon {
+      flex-shrink: 0;
+      width: 18px;
+      height: 18px;
+      color: var(--accent-red);
+    }
+
+    .conn-alert-body {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .conn-alert-body strong {
+      display: block;
+      font-size: 13.5px;
+      color: var(--accent-red);
+      margin-bottom: 2px;
+    }
+
+    .conn-alert-retry {
+      flex-shrink: 0;
+      align-self: center;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--accent-red);
+      background: transparent;
+      color: var(--accent-red);
+      cursor: pointer;
+    }
+
+    .conn-alert-retry:hover {
+      background: color-mix(in srgb, var(--accent-red) 12%, transparent);
+    }
+
+    .conn-alert-retry:disabled {
+      opacity: .6;
+      cursor: default;
+    }
+
+    /* Variante informativa (no error): mismo formato que .conn-alert pero
+       en el tono de acento, para el aviso de "certificado recuperado". */
+    .conn-alert--info {
+      background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+      border-color: color-mix(in srgb, var(--accent) 45%, transparent);
+      border-left-color: var(--accent);
+    }
+
+    .conn-alert--info .conn-alert-icon {
+      color: var(--accent);
+    }
+
+    .conn-alert--info .conn-alert-body strong {
+      color: var(--accent);
+    }
+
+    /* Campo "N° de certificado" cuando no se pudo calcular por falta de
+       conexión: borde rojo + texto en itálica, y una línea de ayuda
+       debajo (mismo patrón que .char-count.warn). */
+    input#f-certNumber.conn-error {
+      border-color: var(--accent-red);
+      font-style: italic;
+      color: var(--text-muted);
+    }
+
+    .field-error {
+      font-size: 11.5px;
+      color: var(--accent-red);
+      font-weight: 600;
+      margin-top: 4px;
+    }
+
+    .field-error[hidden] {
+      display: none;
+    }
   </style>
 </head>
 
@@ -584,7 +831,6 @@
   <div class="topbar">
     <div class="topbar-title">
       <h1>Certificados de Lavado de Tanques</h1>
-      <div class="subtitle">Genera, descarga e imprime certificados sin conexión a internet</div>
     </div>
     <div class="topbar-actions">
       <button class="btn btn-primary" id="btnDownload">
@@ -613,11 +859,45 @@
         </svg>
         Descargar PDF
       </button>
+      <button class="btn btn-neutral" id="btnSearch" title="Buscar un certificado ya emitido">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="11" cy="11" r="7" />
+          <path d="m20 20-3.5-3.5" />
+        </svg>
+        Buscar
+      </button>
       <button class="btn btn-neutral" id="btnNew" aria-label="Nuevo certificado" title="Nuevo certificado">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M12 5v14M5 12h14" />
         </svg>
       </button>
+    </div>
+  </div>
+
+  <!-- Aviso de conexión: se necesita internet para guardar el certificado
+       en Supabase y calcular su número. Oculto salvo que algo falle. -->
+  <div class="conn-alert" id="connAlert" hidden role="alert">
+    <svg class="conn-alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M12 9v4m0 4h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+    </svg>
+    <div class="conn-alert-body">
+      <strong>Se necesita conexión a internet</strong>
+      <span id="connAlertMsg">No se pudo conectar con la base de datos. El certificado no se puede
+        generar ni numerar hasta que vuelva la conexión.</span>
+    </div>
+    <button type="button" class="conn-alert-retry" id="connAlertRetry">Reintentar</button>
+  </div>
+
+  <!-- Aviso: se está viendo un certificado recuperado (solo lectura). -->
+  <div class="conn-alert conn-alert--info" id="recoveredBanner" hidden role="status">
+    <svg class="conn-alert-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
+    <div class="conn-alert-body">
+      <strong>Certificado recuperado — solo lectura</strong>
+      <span>Podés verlo, descargarlo y compartirlo, pero no editar los datos.
+        Para crear uno nuevo, usá el botón "Nuevo certificado".</span>
     </div>
   </div>
 
@@ -631,16 +911,12 @@
           <legend>Certificado</legend>
           <div class="field">
             <label for="f-certNumber">N° de certificado</label>
-            <input type="text" id="f-certNumber" placeholder="Ej: 001/2026">
+            <input type="text" id="f-certNumber" placeholder="Ej: 001/2026" readonly>
+            <div class="field-error" id="certNumberError" hidden>⚠ Necesita internet para calcular el número</div>
           </div>
           <div class="field">
             <label for="f-washDate">Fecha de lavado</label>
             <input type="date" id="f-washDate">
-          </div>
-          <div class="field">
-            <label for="f-statement">Frase de certificación</label>
-            <textarea id="f-statement" rows="2"
-              placeholder="Ej: Nos permitimos certificar el lavado de tanque interior y desinfección"></textarea>
           </div>
         </fieldset>
 
@@ -677,7 +953,7 @@
             </div>
             <div class="field">
               <label for="f-companyPhone">Teléfono</label>
-              <input type="tel" id="f-companyPhone" placeholder="Ej: 33012345">
+              <input type="tel" id="f-companyPhone" inputmode="numeric" placeholder="Ej: 33012345">
             </div>
           </div>
         </fieldset>
@@ -760,7 +1036,9 @@
             <div class="cert-number-row">N° <span class="cert-number"
                 id="certNumber">196/2026</span></div>
 
-            <p class="cert-statement" id="certStatement">Nos permitimos certificar
+            <!-- Frase de certificación: texto FIJO del certificado (no editable,
+                 sin campo en el formulario). -->
+            <p class="cert-statement">Nos permitimos certificar
               el lavado de tanque interior y desinfección</p>
 
             <div class="cert-data-block">
@@ -845,6 +1123,23 @@
         </button>
       </div>
       <button class="share-cancel" id="shareCancel">Cancelar</button>
+    </div>
+  </div>
+
+  <!-- Modal: buscar un certificado ya emitido por placa (para reimprimir
+       una copia cuando el cliente pierde el suyo). -->
+  <div class="share-modal search-modal" id="searchModal" hidden>
+    <div class="share-card search-card" role="dialog" aria-modal="true" aria-labelledby="searchModalTitle">
+      <h3 id="searchModalTitle">Buscar certificado anterior</h3>
+      <p>Escribí la placa del vehículo para recuperar un certificado ya emitido.</p>
+      <form class="search-form" id="searchForm">
+        <input type="text" id="searchPlate" placeholder="Placa (ej: 1234-ABC)" autocomplete="off"
+          aria-label="Placa a buscar">
+        <button type="submit" class="btn btn-primary" id="searchSubmit">Buscar</button>
+      </form>
+      <div class="search-status" id="searchStatus" hidden></div>
+      <ul class="search-results" id="searchResults"></ul>
+      <button class="share-cancel" id="searchCancel">Cerrar</button>
     </div>
   </div>
 
@@ -1371,6 +1666,7 @@
   </style>
 
   <script src="datos-negocio.js"></script>
+  <script src="supabase-config.js"></script>
   <script>
     /* ============================================================
        4. DATOS FIJOS DEL NEGOCIO (solo lectura)
@@ -1389,27 +1685,138 @@
     };
 
     /* ============================================================
+       4b. SUPABASE — historial de certificados + numeración anual
+       La web NO tiene login: se usa el rol público (anon) y las
+       políticas RLS de la tabla "certificados" (ver supabase-setup.sql)
+       permiten SOLO insertar y leer.
+       Regla dura: sin conexión (o cualquier error) NO se genera ni se
+       descarga el certificado, y el N° no se puede calcular.
+       ============================================================ */
+    const sb = (typeof supabase !== 'undefined' && typeof SUPABASE_CONFIG !== 'undefined')
+      ? supabase.createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.anonKey)
+      : null;
+
+    const connAlertEl = document.getElementById('connAlert');
+    const connAlertMsgEl = document.getElementById('connAlertMsg');
+    const connAlertRetryEl = document.getElementById('connAlertRetry');
+    const DEFAULT_CONN_MSG = connAlertMsgEl.textContent;
+
+    function showConnAlert(msg) {
+      connAlertMsgEl.textContent = msg || DEFAULT_CONN_MSG;
+      connAlertEl.hidden = false;
+    }
+    function hideConnAlert() { connAlertEl.hidden = true; }
+
+    /* Consulta a Supabase el último N° usado en el año en curso y
+       devuelve el siguiente ("001/2026"). Lanza si no hay conexión o
+       la consulta falla: el que llama debe mostrar el aviso.
+
+       Trae los N° más recientes (sin filtro LIKE ni comodines: así la
+       URL nunca queda mal formada) y filtra el año en el cliente con
+       parseCertNumber(). El límite alto cubre años de operación. */
+    async function fetchNextCertNumber() {
+      if (!sb) throw new Error('Supabase no disponible');
+      const year = new Date().getFullYear();
+      const { data, error } = await sb
+        .from('certificados')
+        .select('numero_certificado')
+        .order('creado_en', { ascending: false })
+        .limit(2000);
+      if (error) throw error;
+      let maxSeq = 0;
+      (data || []).forEach(row => {
+        const p = parseCertNumber(row.numero_certificado);
+        if (p && p.year === year && p.seq > maxSeq) maxSeq = p.seq;
+      });
+      const seq = maxSeq + 1;
+      return { text: formatCertNumber(seq, year), year, seq };
+    }
+
+    /* N° de certificado ya guardado en ESTA sesión: evita insertar dos
+       filas si se descarga imagen y después PDF del mismo certificado
+       (además del UNIQUE de la tabla, que es la protección real). */
+    let ultimoNumGuardado = null;
+
+    /* Guarda el certificado actual en Supabase. Devuelve true solo si
+       quedó guardado (o ya existía con ese número). Cualquier error de
+       red / servidor => false (y NO se genera el certificado).
+
+       Usa insert() simple (no upsert): funciona con o sin la restricción
+       UNIQUE. Si la tabla tiene el UNIQUE y el número ya existe, Postgres
+       devuelve el código 23505 y lo tratamos como "ya guardado". */
+    async function saveCertToSupabase() {
+      if (!sb) return false;
+      const num = (current.certNumber || '').trim();
+      if (!num) return false;
+      if (num === ultimoNumGuardado) return true;   // ya guardado en esta sesión
+      const fila = {
+        numero_certificado: num,
+        fecha_lavado: current.washDate || null,
+        placa: current.plate || null,
+        marca: current.brand || null,
+        color: current.color || null,
+        conductor: current.driver || null,
+        licencia: current.license || null,
+        empresa: current.company || null,
+        telefono: current.companyPhone || null,
+        producto_utilizado: current.product || null
+      };
+      try {
+        const { error } = await sb.from('certificados').insert(fila);
+        if (error && error.code !== '23505') throw error;
+        ultimoNumGuardado = num;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    /* Puerta común de los 3 botones (imagen / PDF / WhatsApp): antes de
+       generar nada, exige que el registro quede guardado en Supabase.
+       Si falla: aviso (banner + alert) y se aborta la generación. */
+    async function ensureSavedBeforeExport() {
+      // Ya bloqueado (certificado generado o recuperado): la fila ya existe
+      // en Supabase. No se re-inserta ni se sobrescribe; solo se descarga.
+      if (formularioBloqueado()) return true;
+      // Si al cargar no se pudo numerar (sin conexión), el N° está vacío:
+      // no tiene sentido intentar guardar, se avisa directo.
+      if (numeracionOffline || !(current.certNumber || '').trim()) {
+        showConnAlert('No se pudo calcular el número de certificado. Se necesita conexión a internet.');
+        alert('Se necesita conexión a internet para generar el certificado.\n\n'
+          + 'No se pudo obtener el número de certificado desde la base de datos.');
+        return false;
+      }
+      const ok = await saveCertToSupabase();
+      if (!ok) {
+        showConnAlert('No se pudo guardar el certificado en la base de datos. Se necesita conexión a internet para generarlo.');
+        alert('Se necesita conexión a internet para generar el certificado.\n\n'
+          + 'No se pudo guardar el registro en la base de datos. Revisá tu conexión e intentá de nuevo.');
+        return false;
+      }
+      hideConnAlert();
+      // Quedó guardado en Supabase: se bloquea el formulario para que la
+      // copia descargada/compartida no pueda diferir de lo guardado. Se
+      // desbloquea con "Nuevo certificado".
+      current._generado = true;
+      saveJSON(CURRENT_KEY, current);
+      setFormLock(true, 'generado');
+      return true;
+    }
+
+    /* ============================================================
        5. ESTADO Y PERSISTENCIA (localStorage)
        - "jomarCert.current": datos del certificado actual (se limpian
          con el botón "Nuevo certificado")
        ============================================================ */
     const CURRENT_KEY = 'jomarCert.current';
-    /* Contador del N° de certificado, aparte del blob del formulario.
-       { year, seq } = último correlativo USADO. Se reinicia en 001 al
-       cambiar de año (el sufijo "/AAAA" acota la serie a ese año).
-       Prototipo: vive solo en este navegador, sin sincronización. */
+    /* Respaldo local del último N° USADO ({ year, seq }). YA NO es la
+       fuente de la numeración —eso lo calcula Supabase con
+       fetchNextCertNumber()—, solo queda como memoria visual para no
+       perder el dato entre recargas. */
     const LASTNUM_KEY = 'jomarCert.lastNumber';
 
     const pad3 = n => String(n).padStart(3, '0');            // 1→001, 10→010, 100→100
     const formatCertNumber = (seq, year) => pad3(seq) + '/' + year;
-
-    function peekNextCertNumber() {
-      const year = new Date().getFullYear();
-      let last = null;
-      try { last = JSON.parse(localStorage.getItem(LASTNUM_KEY) || 'null'); } catch (e) { /* ignore */ }
-      const seq = (last && last.year === year) ? last.seq + 1 : 1;   // año nuevo → 001
-      return { text: formatCertNumber(seq, year), year, seq };
-    }
 
     function setLastCertNumber(year, seq) {
       try { localStorage.setItem(LASTNUM_KEY, JSON.stringify({ year, seq })); } catch (e) { /* lleno/bloqueado */ }
@@ -1421,10 +1828,20 @@
       return m ? { seq: +m[1], year: +m[2] } : null;
     }
 
+    /* Fecha de HOY en la zona horaria del navegador (el dispositivo del
+       usuario), como "AAAA-MM-DD". NO usar toISOString(): eso convierte
+       a UTC y en zonas al oeste de Greenwich adelanta un día por la
+       noche. getFullYear/getMonth/getDate leen la fecha local. */
+    function hoyLocalISO() {
+      const d = new Date();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${d.getFullYear()}-${mm}-${dd}`;
+    }
+
     const defaultCurrent = {
       certNumber: '',
-      washDate: new Date().toISOString().slice(0, 10),
-      statement: 'Nos permitimos certificar el lavado de tanque interior y desinfección',
+      washDate: hoyLocalISO(),
       plate: '1234-ABC',
       brand: 'Volvo FH 440',
       color: 'Blanco',
@@ -1450,11 +1867,19 @@
     /* ============================================================
        6. FORMULARIO ↔ ESTADO (solo los datos del certificado)
        ============================================================ */
-    const currentFields = ['certNumber', 'washDate', 'statement', 'plate', 'brand', 'color', 'license', 'driver', 'company', 'companyPhone', 'product'];
+    const currentFields = ['certNumber', 'washDate', 'plate', 'brand', 'color', 'license', 'driver', 'company', 'companyPhone', 'product'];
 
     /* Campos que se pasan a MAYÚSCULAS mientras se escriben (y al cargar).
        Teléfonos quedan fuera: son números. */
     const UPPER_FIELDS = ['plate', 'brand', 'color', 'driver', 'license', 'company'];
+
+    /* Filtros que se aplican mientras se escribe (antes de las mayúsculas):
+       - driver: solo letras (con acentos y ñ) y espacios — sin números ni símbolos
+       - companyPhone: solo dígitos */
+    const SANITIZERS = {
+      driver: v => v.replace(/[^\p{L}\s]/gu, ''),
+      companyPhone: v => v.replace(/\D/g, '')
+    };
 
     /* --- "Producto utilizado": el textarea crece con el contenido y un
        contador avisa al acercarse al tope de 900 caracteres (límite que
@@ -1462,9 +1887,6 @@
     const PRODUCT_MAX = 900;
     const productEl = document.getElementById('f-product');
     const productCountEl = document.getElementById('productCount');
-    /* "Frase de certificación": mismo auto-crecimiento que "Producto
-       utilizado" (crece línea a línea, sin scroll interno, sin cortar). */
-    const statementEl = document.getElementById('f-statement');
 
     function autoGrow(el) {
       el.style.height = 'auto';
@@ -1487,30 +1909,28 @@
       // formulario muestre lo mismo que ya se guarda al escribir
       UPPER_FIELDS.forEach(k => { if (current[k]) current[k] = String(current[k]).toUpperCase(); });
       currentFields.forEach(k => { document.getElementById('f-' + k).value = current[k] || ''; });
-      autoGrow(statementEl);
       updateProductUI();
     }
 
     currentFields.forEach(k => {
       document.getElementById('f-' + k).addEventListener('input', e => {
-        if (UPPER_FIELDS.includes(k)) {
-          const el = e.target;
-          const upper = el.value.toUpperCase();
-          if (upper !== el.value) {
-            const start = el.selectionStart, end = el.selectionEnd;
-            el.value = upper;
-            try { el.setSelectionRange(start, end); } catch (_) { /* algunos tipos no lo soportan */ }
-          }
+        const el = e.target;
+        // filtro de caracteres (driver/telefono) y luego mayúsculas, con
+        // un solo reajuste del cursor si el texto cambió de longitud
+        let v = el.value;
+        if (SANITIZERS[k]) v = SANITIZERS[k](v);
+        if (UPPER_FIELDS.includes(k)) v = v.toUpperCase();
+        if (v !== el.value) {
+          const removed = el.value.length - v.length;
+          const start = el.selectionStart, end = el.selectionEnd;
+          el.value = v;
+          try {
+            el.setSelectionRange(Math.max(0, start - removed), Math.max(0, end - removed));
+          } catch (_) { /* algunos tipos no lo soportan */ }
         }
-        current[k] = e.target.value;
+        current[k] = v;
         saveJSON(CURRENT_KEY, current);
         if (k === 'product') updateProductUI();
-        if (k === 'statement') autoGrow(statementEl);
-        // si el N° editado a mano parsea como NNN/AAAA, el contador lo sigue
-        if (k === 'certNumber') {
-          const p = parseCertNumber(e.target.value);
-          if (p) setLastCertNumber(p.year, p.seq);
-        }
         renderCertificate();
       });
     });
@@ -1543,7 +1963,6 @@
       document.getElementById('certLogoImg').src = business.logoDataUrl || 'logo.png';
 
       document.getElementById('certNumber').textContent = current.certNumber || '';
-      document.getElementById('certStatement').textContent = current.statement || '';
       document.getElementById('d-plate').textContent = current.plate || '';
       document.getElementById('d-brand').textContent = current.brand || '';
       document.getElementById('d-color').textContent = current.color || '';
@@ -1699,6 +2118,8 @@
       const btn = document.getElementById('btnDownload');
       btn.disabled = true; btn.style.opacity = '.7';
       try {
+        // Guardado en Supabase primero: si falla, no se genera la imagen.
+        if (!await ensureSavedBeforeExport()) return;
         const canvas = await renderCertificateToCanvas();
         const blob = await new Promise(res => canvas.toBlob(res, 'image/png'));
         await saveFile(certFileName(), blob);
@@ -1713,6 +2134,8 @@
       const btn = document.getElementById('btnDownloadPdf');
       btn.disabled = true; btn.style.opacity = '.7';
       try {
+        // Guardado en Supabase primero: si falla, no se genera el PDF.
+        if (!await ensureSavedBeforeExport()) return;
         await saveFile(certFileNamePdf(), await buildCertPdfBlob());
       } finally {
         btn.disabled = false; btn.style.opacity = '';
@@ -1747,6 +2170,9 @@
       pdfBtn.disabled = imgBtn.disabled = true;
       pdfBtn.style.opacity = imgBtn.style.opacity = '.7';
       try {
+        // Guardado en Supabase primero: si falla, no se comparte nada.
+        if (!await ensureSavedBeforeExport()) { closeShareModal(); return; }
+
         let blob, filename, mime;
         if (format === 'pdf') {
           blob = await buildCertPdfBlob();
@@ -1789,23 +2215,203 @@
       }
     }
 
-    /* ---------- Nuevo certificado: limpia solo datos del vehículo/cliente ---------- */
-    document.getElementById('btnNew').addEventListener('click', () => {
-      if (!confirm('¿Limpiar los datos del vehículo y conductor para un nuevo certificado?')) return;
-      const next = peekNextCertNumber();
-      current = Object.assign({}, defaultCurrent, {
-        certNumber: next.text, washDate: new Date().toISOString().slice(0, 10),
-        plate: '', brand: '', color: '', license: '', driver: '',
-        company: '', companyPhone: '', product: ''
+    /* ============================================================
+       10. BUSCAR / RECUPERAR UN CERTIFICADO ANTERIOR
+       Cuando un cliente pierde su certificado, se busca por placa en
+       Supabase (lectura pública) y se carga en modo SOLO LECTURA: se
+       puede ver / descargar / compartir, pero no editar ni re-guardar.
+       Se sale del modo con "Nuevo certificado".
+       ============================================================ */
+
+    /* El formulario está bloqueado (solo lectura) cuando el certificado ya
+       existe en Supabase: recién generado (_generado) o traído por búsqueda
+       (_recuperado). Se sale del bloqueo con "Nuevo certificado". */
+    function formularioBloqueado() { return !!(current._recuperado || current._generado); }
+
+    /* Texto de placeholder original de cada campo (hint "Ej: ..."), capturado
+       una sola vez: en modo bloqueado se reemplaza por "(sin datos)" y al
+       desbloquear se restaura. */
+    const PLACEHOLDERS_EDIT = {};
+    currentFields.forEach(k => {
+      PLACEHOLDERS_EDIT[k] = document.getElementById('f-' + k).placeholder;
+    });
+
+    /* Bloquea (o desbloquea) todos los campos editables del formulario y
+       muestra el banner con el texto según el motivo ('generado' | 'recuperado').
+       #f-certNumber queda fuera: ya es readonly de forma permanente. */
+    function setFormLock(locked, motivo) {
+      currentFields.forEach(k => {
+        if (k === 'certNumber') return;
+        const el = document.getElementById('f-' + k);
+        el.readOnly = locked;
+        el.placeholder = locked ? '(sin datos)' : PLACEHOLDERS_EDIT[k];
       });
-      setLastCertNumber(next.year, next.seq);   // "reserva" ese número
+      document.body.classList.toggle('cert-locked', locked);
+      const banner = document.getElementById('recoveredBanner');
+      if (locked) {
+        const strong = banner.querySelector('strong');
+        const span = banner.querySelector('span');
+        if (motivo === 'generado') {
+          strong.textContent = 'Certificado generado — solo lectura';
+          span.textContent = 'Ya quedó guardado. Podés descargarlo y compartirlo las veces '
+            + 'que quieras, pero no editar los datos. Para crear otro, usá el botón "Nuevo certificado".';
+        } else {
+          strong.textContent = 'Certificado recuperado — solo lectura';
+          span.textContent = 'Podés verlo, descargarlo y compartirlo, pero no editar los datos. '
+            + 'Para crear uno nuevo, usá el botón "Nuevo certificado".';
+        }
+      }
+      banner.hidden = !locked;
+    }
+
+    /* Carga una fila de Supabase en el formulario y activa el modo
+       solo lectura ("certificado recuperado"). */
+    function usarCertificadoRecuperado(row) {
+      current = {
+        certNumber: row.numero_certificado || '',
+        washDate: row.fecha_lavado || '',
+        plate: row.placa || '',
+        brand: row.marca || '',
+        color: row.color || '',
+        license: row.licencia || '',
+        driver: row.conductor || '',
+        company: row.empresa || '',
+        companyPhone: row.telefono || '',
+        product: row.producto_utilizado || '',
+        _recuperado: true
+      };
       saveJSON(CURRENT_KEY, current);
       fillFormFromState();
       renderCertificate();
-      // queda autocompletado y seleccionado: se corrige de una o se tabula
-      const numEl = document.getElementById('f-certNumber');
-      numEl.focus();
-      numEl.select();
+      setFormLock(true, 'recuperado');
+      // el N° recuperado no debe quedar en estado de error de conexión
+      numeracionOffline = false;
+      certNumberEl.classList.remove('conn-error');
+      certNumberErrEl.hidden = true;
+      hideConnAlert();
+      closeSearchModal();
+      // llevar la vista al certificado para que se vea la copia
+      document.querySelector('.app-grid').classList.add('preview-on');
+      document.getElementById('btnTogglePreview').classList.add('active');
+      document.getElementById('btnTogglePreview').setAttribute('aria-pressed', 'true');
+    }
+
+    /* ---------- Modal de búsqueda ---------- */
+    const searchModal = document.getElementById('searchModal');
+    const searchForm = document.getElementById('searchForm');
+    const searchPlateEl = document.getElementById('searchPlate');
+    const searchSubmitEl = document.getElementById('searchSubmit');
+    const searchStatusEl = document.getElementById('searchStatus');
+    const searchResultsEl = document.getElementById('searchResults');
+
+    function openSearchModal() {
+      searchStatusEl.hidden = true;
+      searchStatusEl.classList.remove('error');
+      searchResultsEl.replaceChildren();
+      searchModal.hidden = false;
+      searchPlateEl.focus();
+    }
+    function closeSearchModal() { searchModal.hidden = true; }
+
+    function setSearchStatus(text, isError) {
+      searchStatusEl.textContent = text;
+      searchStatusEl.classList.toggle('error', !!isError);
+      searchStatusEl.hidden = false;
+    }
+
+    async function buscarCertificados(placaRaw) {
+      // limpia espacios y los comodines de LIKE para que la coincidencia
+      // parcial sea segura ("1234" encuentra "1234-ABC")
+      const q = placaRaw.trim().replace(/[%_\\]/g, '');
+      if (!q) { setSearchStatus('Escribí una placa para buscar.', true); return; }
+      if (!sb) { setSearchStatus('No se pudo conectar. Se necesita internet para buscar.', true); return; }
+
+      searchSubmitEl.disabled = true;
+      searchResultsEl.replaceChildren();
+      setSearchStatus('Buscando…', false);
+      try {
+        const { data, error } = await sb
+          .from('certificados')
+          .select('numero_certificado, fecha_lavado, placa, marca, color, conductor, licencia, empresa, telefono, producto_utilizado')
+          .ilike('placa', '%' + q + '%')
+          .order('creado_en', { ascending: false })
+          .limit(50);
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+          setSearchStatus(`No se encontró ningún certificado con la placa "${q}".`, false);
+          return;
+        }
+        setSearchStatus(data.length === 1
+          ? '1 certificado encontrado' : `${data.length} certificados encontrados`, false);
+        renderSearchResults(data);
+      } catch (e) {
+        setSearchStatus('No se pudo conectar. Se necesita internet para buscar.', true);
+      } finally {
+        searchSubmitEl.disabled = false;
+      }
+    }
+
+    function renderSearchResults(rows) {
+      // se construyen los <li> con textContent (los datos vienen de la BD)
+      const frag = document.createDocumentFragment();
+      rows.forEach(row => {
+        const li = document.createElement('li');
+        li.className = 'search-result';
+
+        const top = document.createElement('div');
+        top.className = 'search-result-top';
+        const num = document.createElement('span');
+        num.textContent = 'N° ' + (row.numero_certificado || '—');
+        const date = document.createElement('span');
+        date.className = 'search-result-date';
+        date.textContent = formatDate(row.fecha_lavado) || 'sin fecha';
+        top.append(num, date);
+
+        const driver = document.createElement('div');
+        driver.className = 'search-result-driver';
+        driver.textContent = 'Conductor: ' + (row.conductor || '—');
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn btn-primary';
+        btn.textContent = 'Usar este';
+        btn.addEventListener('click', () => usarCertificadoRecuperado(row));
+
+        li.append(top, driver, btn);
+        frag.appendChild(li);
+      });
+      searchResultsEl.replaceChildren(frag);
+    }
+
+    document.getElementById('btnSearch').addEventListener('click', openSearchModal);
+    document.getElementById('searchCancel').addEventListener('click', closeSearchModal);
+    searchModal.addEventListener('click', e => { if (e.target === searchModal) closeSearchModal(); });
+    document.addEventListener('keydown', e => {
+      if (e.key === 'Escape' && !searchModal.hidden) closeSearchModal();
+    });
+    searchForm.addEventListener('submit', e => {
+      e.preventDefault();
+      buscarCertificados(searchPlateEl.value);
+    });
+
+    /* ---------- Nuevo certificado: limpia datos y sale del modo solo lectura ---------- */
+    document.getElementById('btnNew').addEventListener('click', async () => {
+      if (!confirm('¿Limpiar los datos del vehículo y conductor para un nuevo certificado?')) return;
+      current = Object.assign({}, defaultCurrent, {
+        certNumber: '', washDate: hoyLocalISO(),
+        plate: '', brand: '', color: '', license: '', driver: '',
+        company: '', companyPhone: '', product: ''
+      });
+      // current._recuperado / _generado quedan undefined => vuelve el modo edición
+      saveJSON(CURRENT_KEY, current);
+      setFormLock(false);
+      fillFormFromState();
+      renderCertificate();
+      // recalcula el N° desde Supabase (o deja el aviso "sin conexión")
+      await initCertNumber();
+      // el cursor va al primer campo editable
+      document.getElementById('f-plate').focus();
     });
 
     /* ============================================================
@@ -1834,26 +2440,70 @@
 
     /* ============================================================
        9. INICIO
+       El N° de certificado se calcula SIEMPRE consultando Supabase
+       (último N° del año + 1) y NO es editable a mano. Sin conexión al
+       cargar: el campo queda vacío con el aviso "sin conexión" y aparece
+       el banner.
+       La fecha de lavado arranca en HOY (zona horaria del dispositivo)
+       pero SÍ se puede editar a mano.
        ============================================================ */
-    (function initCertNumber() {
-      const firstRun = localStorage.getItem(CURRENT_KEY) === null;
-      let last = null;
-      try { last = JSON.parse(localStorage.getItem(LASTNUM_KEY) || 'null'); } catch (e) { /* ignore */ }
-      if (firstRun) {
-        // navegador nuevo: arranca en 001 del año actual
-        const next = peekNextCertNumber();
+    const certNumberEl = document.getElementById('f-certNumber');
+    const certNumberErrEl = document.getElementById('certNumberError');
+    let numeracionOffline = false;
+
+    async function initCertNumber() {
+      try {
+        const next = await fetchNextCertNumber();
         current.certNumber = next.text;
         setLastCertNumber(next.year, next.seq);
         saveJSON(CURRENT_KEY, current);
-      } else if (!last) {
-        // ya hay datos pero no contador: se siembra del número que haya
-        const p = parseCertNumber(current.certNumber);
-        if (p) setLastCertNumber(p.year, p.seq);
+        certNumberEl.value = current.certNumber;
+        certNumberEl.classList.remove('conn-error');
+        certNumberEl.placeholder = 'Ej: 001/2026';
+        certNumberErrEl.hidden = true;
+        numeracionOffline = false;
+        hideConnAlert();
+      } catch (e) {
+        // sin internet: no se puede numerar y no se debería generar
+        numeracionOffline = true;
+        current.certNumber = '';
+        certNumberEl.value = '';
+        certNumberEl.placeholder = 'Sin conexión';
+        certNumberEl.classList.add('conn-error');
+        certNumberErrEl.hidden = false;
+        showConnAlert('No se pudo calcular el número de certificado. Se necesita conexión a internet.');
       }
-    })();
+      renderCertificate();
+    }
 
-    fillFormFromState();
-    renderCertificate();
+    // "Reintentar" del banner: vuelve a intentar la conexión / numeración
+    connAlertRetryEl.addEventListener('click', async () => {
+      connAlertRetryEl.disabled = true;
+      const prev = connAlertRetryEl.textContent;
+      connAlertRetryEl.textContent = 'Reintentando…';
+      try { await initCertNumber(); }
+      finally { connAlertRetryEl.disabled = false; connAlertRetryEl.textContent = prev; }
+    });
+
+    if (current._recuperado || current._generado) {
+      // La página se recargó con un certificado ya emitido (generado o
+      // recuperado): se reactiva el modo solo lectura y NO se toca el N°
+      // ni la fecha (son los del certificado original). Se sale con
+      // "Nuevo certificado".
+      fillFormFromState();
+      renderCertificate();
+      setFormLock(true, current._recuperado ? 'recuperado' : 'generado');
+    } else {
+      // La fecha de lavado siempre es HOY del dispositivo: se refresca al
+      // cargar para que una fecha vieja guardada en localStorage no quede
+      // pegada si la página estuvo abierta de un día para otro.
+      current.washDate = hoyLocalISO();
+      saveJSON(CURRENT_KEY, current);
+
+      fillFormFromState();
+      renderCertificate();
+      initCertNumber();
+    }
   </script>
 </body>
 
