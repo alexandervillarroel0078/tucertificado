@@ -13,7 +13,7 @@
      ============================================================ -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link
-    href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;1,600&family=Barlow+Condensed:wght@600;700&family=Lobster&display=swap"
+    href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Barlow+Condensed:wght@600;700&family=Lobster&display=swap"
     rel="stylesheet">
 
   <!-- html2canvas: exportación del certificado a imagen PNG -->
@@ -996,11 +996,14 @@
             <div class="cert-header">
               <div class="cert-brand">
                 <div class="cert-eyebrow" id="certEyebrow">
-                  <svg class="cert-eyebrow-arc" viewBox="0 -16 280 100"
+                  <svg class="cert-eyebrow-arc" viewBox="0 -12 280 68"
                     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
                     role="img" aria-label="Estación de servicio y lavado">
                     <defs>
-                      <path id="certEyebrowArcPath" d="M 10,80 A 150,150 0 0 1 270,80" fill="none"></path>
+                      <!-- arco más plano (radio 190) y con las puntas altas: el texto
+                           ocupa ~88% del path (antes ~79%), casi sin "patas" vacías.
+                           El viewBox recorta la zona muerta de abajo. -->
+                      <path id="certEyebrowArcPath" d="M 12,56 A 190,190 0 0 1 268,56" fill="none"></path>
                     </defs>
                     <text class="cert-eyebrow-arc-text" text-anchor="middle">
                       <textPath href="#certEyebrowArcPath" xlink:href="#certEyebrowArcPath"
@@ -1011,8 +1014,6 @@
                 <div class="cert-logo" id="certLogo">
                   <img id="certLogoImg" src="logo.png" alt="Logo del negocio">
                 </div>
-                <div class="cert-business-name" id="certBusinessName">Jomar</div>
-                <div class="cert-owner-line" id="certOwnerName">Prop. Ing. Miguel Ángel Martínez Durán</div>
                 <div class="cert-address-line" id="certAddressLine">Av. Marcelo Quiroga Santa Cruz #87 - 7° anillo
                   entre la
                   Av. Miguel de Cervantes y Av. Olímpica</div>
@@ -1159,10 +1160,14 @@
     .certificate {
       --paper: #ffffff;
       --ink: #1a1a1a;
-      --blue-dark: #0d2b6b;
-      --blue-mid: #1a3d8f;
+      /* Paleta "plomo" (gris/plateado, como el logo). Se conservan los
+         nombres --blue-* para no tocar cada regla; los valores son grises.
+         Contraste con blanco: #374151 ≈ 9.3:1, #4b5563 ≈ 7.4:1,
+         #6b7280 ≈ 4.8:1 (todos ≥ AA). El N° del certificado sigue en rojo. */
+      --blue-dark: #374151;
+      --blue-mid: #6b7280;
       --red: #c0281c;
-      --label-blue: #1a3d8f;
+      --label-blue: #4b5563;
 
       width: 100%;
       max-width: 850px;
@@ -1170,9 +1175,10 @@
       background: var(--paper);
       color: var(--ink);
       font-family: 'Barlow', system-ui, sans-serif;
-      /* marco tipo diploma: contorno azul del header que encierra todo el
-         documento de punta a punta (también se imprime, ver @media print) */
-      border: 2px solid var(--blue-mid);
+      /* marco tipo diploma que encierra todo el documento de punta a punta
+         (también se imprime, ver @media print). Usa el plomo más oscuro
+         para que se vea bien contra el gris claro de la pantalla. */
+      border: 2px solid var(--blue-dark);
       box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
       padding-bottom: clamp(6px, 1cqw, 10px);
     }
@@ -1188,7 +1194,7 @@
    dirección y celular, apilados y centrados horizontalmente. Todo el
    bloque queda centrado verticalmente contra la franja azul. */
     .cert-brand {
-      flex: 0 1 36%;
+      flex: 0 1 38%;
       min-width: 0;
       display: flex;
       flex-direction: column;
@@ -1204,21 +1210,20 @@
       max-width: 100%;
     }
 
-    /* Logo: cuadrado con esquinas suaves ~90-100px a tamaño de diseño/
-   exportación (clamp para no romper el escalado fluido en la vista
-   previa angosta). Borde sutil gris del tema; imagen completa con
-   object-fit: contain, sin deformarse ni recortarse. */
+    /* Logo: sin marco ni fondo (se apoya directo sobre el papel), más
+   grande que antes. object-fit: contain => nunca se deforma ni recorta.
+   El clamp mantiene el escalado fluido en la vista previa angosta. */
     .cert-logo {
-      width: clamp(60px, 11.5cqw, 100px);
-      height: clamp(60px, 11.5cqw, 100px);
-      border-radius: 11px;
-      overflow: hidden;
+      width: clamp(120px, 27cqw, 240px);
+      /* aspect-ratio nativo de logo.png (1152x922) => sin height fijo y
+         sin letterbox: la caja ES la imagen visible. */
+      aspect-ratio: 1152 / 922;
       flex-shrink: 0;
-      background: #fff;
-      border: 1.5px solid #c9d2e4;
-      /* margen superior negativo: el arco del rubro deja una "cuenca"
-         vacía debajo; se sube el logo para que quede acurrucado bajo él. */
-      margin: clamp(-24px, -3.4cqw, -14px) 0 clamp(4px, 0.8cqw, 8px);
+      /* margen superior negativo: sube el logo para que anide justo bajo
+         el arco recortado. Puede solaparse con las puntas del arco
+         (permitido); el logo pinta DESPUÉS que el SVG en el DOM, así que
+         la imagen del logo nunca queda tapada por el texto del arco. */
+      margin: clamp(-18px, -2.2cqw, -10px) 0 clamp(4px, 0.8cqw, 8px);
     }
 
     .cert-logo img {
@@ -1232,14 +1237,26 @@
       display: none;
     }
 
-    /* El rubro ahora se dibuja en arco sobre el logo con <textPath>. */
+    /* El rubro se dibuja en arco sobre el logo con <textPath>. */
     .cert-eyebrow {
       line-height: 0;
+      width: 100%;
+      /* ocupa el ancho de la columna de marca para que el arco de abajo
+         pueda medir su tope real y escalar hacia abajo si no hay espacio */
     }
 
+    /* Arco "ESTACIÓN DE SERVICIO Y LAVADO": se agranda escalando TODO el
+       SVG con este width. viewBox, radio del path y font-size están en el
+       mismo sistema de coordenadas, así que la relación texto/longitud-de-
+       path no cambia y el texto NO se corta. En pantallas angostas
+       max-width:100% lo achica dentro de la columna (nunca desborda bajo
+       la franja del título). overflow:visible deja pasar los remates que
+       sobresalen del viewBox. */
     .cert-eyebrow-arc {
       display: block;
-      width: clamp(160px, 23cqw, 205px);
+      width: clamp(200px, 42cqw, 300px);
+      max-width: 100%;
+      margin-inline: auto;
       height: auto;
       overflow: visible;
     }
@@ -1251,20 +1268,6 @@
       letter-spacing: .3px;
       text-transform: uppercase;
       fill: var(--blue-dark);
-    }
-
-    .cert-business-name {
-      font-family: 'Lobster', cursive;
-      font-size: clamp(20px, 3.6cqw, 34px);
-      line-height: 1.05;
-      color: var(--blue-dark);
-    }
-
-    .cert-owner-line {
-      font-size: clamp(11px, 1.35cqw, 13px);
-      font-weight: 700;
-      color: #222;
-      line-height: 1.25;
     }
 
     .cert-address-line {
@@ -1291,7 +1294,7 @@
    azul con el título abajo. Ocupa el mismo ancho que antes tenía
    la franja azul sola (no todo el encabezado). */
     .cert-title-col {
-      flex: 1 1 64%;
+      flex: 1 1 62%;
       min-width: 0;
       display: flex;
       flex-direction: column;
@@ -1341,6 +1344,21 @@
       justify-content: center;
       padding: clamp(9px, 1.6cqw, 15px) clamp(10px, 2.4cqw, 24px);
       overflow: hidden;
+    }
+
+    /* Línea de acento al inicio de la franja del título. Pseudo-elemento
+       absoluto: no ocupa espacio en el flujo => no cambia el tamaño de la
+       franja, del certificado ni de ningún otro elemento. Queda recortado
+       al borde de la franja por el overflow: hidden de arriba. */
+    .cert-title-band::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: clamp(4px, 0.7cqw, 6px);
+      background: var(--blue-dark);
+      pointer-events: none;
     }
 
     .cert-title-text {
@@ -1445,7 +1463,7 @@
 
     .cert-field .label {
       color: var(--label-blue);
-      font-weight: 700;
+      font-weight: 800;
       flex-shrink: 0;
       min-width: clamp(100px, 17cqw, 165px);
     }
@@ -1465,7 +1483,7 @@
       font-weight: 700;
       font-size: clamp(12px, 1.6cqw, 16px);
       letter-spacing: .06em;
-      color: var(--blue-mid);
+      color: var(--label-blue);
       text-transform: uppercase;
       margin-bottom: 6px;
       display: flex;
@@ -1476,7 +1494,7 @@
     .cert-product-icon {
       width: clamp(12px, 1.7cqw, 17px);
       height: clamp(12px, 1.7cqw, 17px);
-      fill: var(--blue-mid);
+      fill: var(--label-blue);
       flex-shrink: 0;
     }
 
@@ -1649,7 +1667,7 @@
         width: 100%;
         max-width: 100%;
         /* el marco de diploma sí se imprime */
-        border: 2px solid var(--blue-mid);
+        border: 2px solid var(--blue-dark);
         box-shadow: none;
       }
 
@@ -1950,8 +1968,6 @@
       document.getElementById('certEyebrowText').textContent = (business.tagline || '').toUpperCase();
       eyebrowEl.hidden = !business.tagline;
 
-      document.getElementById('certBusinessName').textContent = business.businessName || 'Tu Negocio';
-      document.getElementById('certOwnerName').textContent = business.ownerName || '';
       document.getElementById('certAddressLine').textContent = business.address || '';
 
       const phoneEl = document.getElementById('certPhoneLine');
