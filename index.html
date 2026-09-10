@@ -996,16 +996,34 @@
             <div class="cert-header">
               <div class="cert-brand">
                 <div class="cert-eyebrow" id="certEyebrow">
-                  <svg class="cert-eyebrow-arc" viewBox="0 -12 280 68"
+                  <!-- Arco del rubro. Puntos clave para que NO se corte al EXPORTAR:
+                       - La fuente Barlow 800 va EMBEBIDA acá abajo como @font-face
+                         (woff2 base64, subset). html2canvas serializa este <svg> a
+                         un <img> aislado que NO ve las fuentes de la pagina; con la
+                         fuente embebida, exportacion y navegador miden IGUAL.
+                       - viewBox 0 0 300 132: alto (132) para contener el texto
+                         curvado; ancho con ~15u de aire a cada lado del texto.
+                       - El alto extra de la caja se devuelve con margenes negativos
+                         simetricos => logo, franja, iconos y N no se mueven. -->
+                  <svg class="cert-eyebrow-arc" viewBox="0 0 300 132"
                     xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
                     role="img" aria-label="Estación de servicio y lavado">
                     <defs>
-                      <!-- arco más plano (radio 190) y con las puntas altas: el texto
-                           ocupa ~88% del path (antes ~79%), casi sin "patas" vacías.
-                           El viewBox recorta la zona muerta de abajo. -->
-                      <path id="certEyebrowArcPath" d="M 12,56 A 190,190 0 0 1 268,56" fill="none"></path>
+                      <style>
+                        @font-face {
+                          font-family: 'BarlowArc';
+                          font-style: normal;
+                          font-weight: 800;
+                          src: url(data:font/woff2;base64,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) format('woff2');
+                        }
+                      </style>
+                      <!-- Mitad SUPERIOR de un círculo grande (radio 138.8, centro
+                           150,174) centrado sobre el logo. El texto va pegado a la
+                           línea, por dentro, solo en la parte de arriba (±63.7° el
+                           texto sobre un path de ±70.5°, ~88% => no se corta). -->
+                      <path id="certEyebrowArcPath" d="M 19.17,127.67 A 138.8,138.8 0 0 1 280.83,127.67" fill="none"></path>
                     </defs>
-                    <text class="cert-eyebrow-arc-text" text-anchor="middle">
+                    <text class="cert-eyebrow-arc-text" text-anchor="middle" dominant-baseline="middle">
                       <textPath href="#certEyebrowArcPath" xlink:href="#certEyebrowArcPath"
                         startOffset="50%" id="certEyebrowText">ESTACIÓN DE SERVICIO Y LAVADO</textPath>
                     </text>
@@ -1241,33 +1259,46 @@
     .cert-eyebrow {
       line-height: 0;
       width: 100%;
-      /* ocupa el ancho de la columna de marca para que el arco de abajo
-         pueda medir su tope real y escalar hacia abajo si no hay espacio */
+      /* z-index: el arco baja sobre el logo y se pinta ENCIMA (no detrás).
+         No cambia el layout: position:relative sin desplazamiento. */
+      position: relative;
+      z-index: 1;
     }
 
-    /* Arco "ESTACIÓN DE SERVICIO Y LAVADO": se agranda escalando TODO el
-       SVG con este width. viewBox, radio del path y font-size están en el
-       mismo sistema de coordenadas, así que la relación texto/longitud-de-
-       path no cambia y el texto NO se corta. En pantallas angostas
-       max-width:100% lo achica dentro de la columna (nunca desborda bajo
-       la franja del título). overflow:visible deja pasar los remates que
-       sobresalen del viewBox. */
+    /* Arco "ESTACIÓN DE SERVICIO Y LAVADO": en el flujo (como antes) y centrado
+       con margin-inline:auto. El viewBox 0 0 300 132 contiene TODO el texto curvado
+       (la fuente va embebida en el <svg>, ver arriba), así la exportación a imagen
+       lo captura completo sin depender de overflow. La caja del SVG es más alta que
+       antes; los márgenes negativos simétricos —con el MISMO valor que el ancho real
+       del SVG— devuelven ese alto extra: footprint = (68/280)·ancho, idéntico a
+       antes, y el centro del arco cae donde caía el de la caja vieja. Logo, franja,
+       íconos, N° y alto total quedan EXACTAMENTE en su lugar, a cualquier ancho. */
     .cert-eyebrow-arc {
       display: block;
-      width: clamp(200px, 42cqw, 300px);
-      max-width: 100%;
+      width: min(100%, clamp(200px, 42cqw, 300px));
       margin-inline: auto;
+      /* Caja: alto = ancho·132/300 = 0.44·ancho.  Alto viejo = ancho·68/280 =
+         0.24286·ancho.  Creció 0.19714·ancho => márgenes negativos iguales de la
+         mitad (0.098571 del MISMO ancho real del SVG). footprint = (68/280)·ancho. */
+      margin-top: calc(min(100%, clamp(200px, 42cqw, 300px)) * -0.0985714);
+      margin-bottom: calc(min(100%, clamp(200px, 42cqw, 300px)) * -0.0985714);
       height: auto;
       overflow: visible;
+      pointer-events: none;
     }
 
     .cert-eyebrow-arc-text {
-      font-family: 'Barlow', Arial, Helvetica, sans-serif;
-      font-size: 16px;
-      font-weight: 700;
-      letter-spacing: .3px;
+      /* 'BarlowArc' = Barlow 800 embebida en el <svg> (para que la exportación
+         mida igual que el navegador). Fallbacks por si el data-URI fallara. */
+      font-family: 'BarlowArc', 'Barlow', Arial, Helvetica, sans-serif;
+      /* font-size en unidades del viewBox (no px de pantalla): escala junto
+         con el SVG, así la relación texto/largo-de-path es fija y el texto
+         nunca se corta. 20u en el viewBox de 300 ≈ 18.8px de pantalla al máximo. */
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0;
       text-transform: uppercase;
-      fill: var(--blue-dark);
+      fill: #2b2b2b;
     }
 
     .cert-address-line {
