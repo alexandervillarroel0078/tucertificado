@@ -1050,10 +1050,10 @@
                     DESINFECCIÓN Y MANTENIMIENTO DE TANQUE</div>
                 </div>
                 <div class="cert-vehicle-icons">
-                  <img src="certificado-imagenes/iconos/volvo.png" alt="">
-                  <img src="certificado-imagenes/iconos/auto4xx4.png" alt="">
-                  <img src="certificado-imagenes/iconos/transportador.png" alt="">
-                  <img src="certificado-imagenes/iconos/cargero.png" alt="">
+                  <img src="certificado-imagenes/autos/cisterna.png" alt="">
+                  <img src="certificado-imagenes/autos/land-cruiser.png" alt="">
+                  <img src="certificado-imagenes/autos/camion.png" alt="">
+                  <img src="certificado-imagenes/autos/tractor_marc.png" alt="">
                 </div>
               </div>
             </div>
@@ -1387,6 +1387,14 @@
       object-fit: contain;
       object-position: center;
       /* colores originales del PNG, sin filtro */
+    }
+
+    /* La cisterna (1er ícono) tiene un recuadro casi cuadrado (aspect ~1.03)
+       frente a la celda apaisada, así que object-fit:contain la deja más
+       angosta que el furgón/tractor -> se ve con menos peso visual. Se
+       compensa escalándola un poco, sin tocar los otros 3. */
+    .cert-vehicle-icons img:nth-child(1) {
+      transform: scale(1.18);
     }
 
     .cert-title-band {
