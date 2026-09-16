@@ -1,0 +1,1235 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Editor del arco — Certificado</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Barlow:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,600&family=Barlow+Condensed:wght@600;700&family=Lobster&display=swap"
+    rel="stylesheet">
+
+  <style>
+    /* ============================================================
+       CHROME DEL EDITOR (no forma parte del certificado)
+       ============================================================ */
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; }
+    body {
+      background: #eef1f6;
+      color: #1c2438;
+      font-family: 'Barlow', system-ui, -apple-system, Segoe UI, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .ed-bar {
+      position: fixed;
+      inset: 0 0 auto 0;
+      z-index: 50;
+      background: #0d2b6b;
+      color: #fff;
+      padding: 9px 16px 11px;
+      box-shadow: 0 6px 18px -8px rgba(13, 43, 107, .5);
+      max-height: 100vh;
+      overflow-y: auto;
+    }
+    .ed-bar-top {
+      display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px;
+    }
+    .ed-bar h1 { font-size: 15px; margin: 0; font-weight: 700; letter-spacing: .2px; flex-shrink: 0; }
+    .ed-readouts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; }
+    .ed-readouts b { font-variant-numeric: tabular-nums; font-weight: 700; color: #ffd86b; }
+    .ed-actions { margin-left: auto; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .ed-btn {
+      font: inherit; font-size: 13px; font-weight: 600; border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, .5); background: transparent; color: #fff;
+      padding: 7px 12px; cursor: pointer;
+    }
+    .ed-btn:hover { border-color: #fff; background: rgba(255, 255, 255, .12); }
+    .ed-btn.primary { background: #fff; color: #0d2b6b; border-color: #fff; }
+    .ed-btn.primary:hover { background: #e7edff; }
+
+    /* fila de controles: cada uno es slider + numero + valor en vivo */
+    .ed-controls {
+      margin-top: 9px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+      gap: 9px 20px;
+      border-top: 1px solid rgba(255, 255, 255, .18);
+      padding-top: 10px;
+    }
+    .ed-ctrl { display: flex; align-items: center; gap: 8px; font-size: 12px; min-width: 0; }
+    .ed-ctrl > .ed-ctrl-label,
+    .ed-ctrl label.ed-inline { flex: 0 0 94px; color: #c7d3f7; user-select: none; }
+    .ed-ctrl label.ed-inline { display: flex; align-items: center; gap: 5px; }
+    .ed-ctrl input[type="range"] { flex: 1 1 40px; min-width: 40px; accent-color: #ffd86b; }
+    .ed-ctrl input[type="number"], .ed-ctrl input[type="text"] {
+      flex: 0 0 auto; width: 54px; font: inherit; font-size: 12px; padding: 4px 5px; border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, .5); background: rgba(255, 255, 255, .12); color: #fff;
+      text-align: right;
+    }
+    .ed-ctrl select {
+      flex: 1 1 auto; min-width: 0;
+      font: inherit; font-size: 12px; padding: 4px 5px; border-radius: 6px;
+      border: 1px solid rgba(255, 255, 255, .5); background: #0d2b6b; color: #fff;
+    }
+    .ed-ctrl.is-off { opacity: .45; }
+    .ed-hint { margin-top: 8px; font-size: 11.5px; color: #9fb3e6; line-height: 1.4; }
+
+    .ed-stage-wrap {
+      margin: 210px auto 40px;
+      padding: 24px;
+      overflow-x: auto;
+      display: flex;
+      justify-content: center;
+    }
+    .ed-stage-card {
+      background: #fff;
+      border: 1px solid #d6dce8;
+      border-radius: 10px;
+      box-shadow: 0 8px 24px -12px rgba(13, 43, 107, .25);
+      padding: 16px;
+      flex-shrink: 0;
+    }
+
+    /* .cert-stage: MISMO contexto que usa la exportación a PNG en index.html
+       (holder de 850px con container-type:inline-size, SIN padding). Así las
+       unidades cqw resuelven igual que en el PNG final y 1px que arrastrás
+       aquí = 1px en el certificado exportado. */
+    .cert-stage {
+      overflow: visible;
+      container-type: inline-size;
+      width: 850px;
+      flex-shrink: 0;
+    }
+    .cert-viewport { overflow: visible; display: flex; justify-content: center; position: relative; }
+
+    /* en producción esto lo oculta la sección 1 (que no copiamos aquí) */
+    .cert-page-number { display: none !important; }
+
+    /* ============================================================
+       DISEÑO DEL CERTIFICADO — copiado TAL CUAL de index.html (secciones 2 y 3).
+       No se modifica: es exactamente lo que se ve en producción.
+       ============================================================ */
+    /* ============================================================
+   2. DISEÑO DEL CERTIFICADO (colores fijos, tamaño fluido)
+   El certificado tiene un ancho de diseño de referencia de 1000px
+   (100% del contenedor, con tope en max-width), y su tipografía usa
+   clamp(mínimo, X-cqw, máximo): "cqw" es 1% del ancho del contenedor
+   con container-type:inline-size más cercano (.cert-stage), así que
+   todo el certificado escala como una sola unidad -sin overflow ni
+   scroll horizontal- tanto en la columna angosta del formulario como
+   a pantalla completa. La exportación a imagen (html2canvas) clona el
+   certificado dentro de un contenedor fijo de 1000px, así que ahí las
+   "cqw" siempre resuelven al tamaño máximo (alta resolución).
+   ============================================================ */
+    .certificate {
+      --paper: #ffffff;
+      --ink: #1a1a1a;
+      /* Paleta "plomo" (gris/plateado, como el logo). Se conservan los
+         nombres --blue-* para no tocar cada regla; los valores son grises.
+         Contraste con blanco: #374151 ≈ 9.3:1, #4b5563 ≈ 7.4:1,
+         #6b7280 ≈ 4.8:1 (todos ≥ AA). El N° del certificado sigue en rojo. */
+      --blue-dark: #374151;
+      --blue-mid: #6b7280;
+      --red: #c0281c;
+      --label-blue: #4b5563;
+
+      width: 100%;
+      max-width: 850px;
+      margin: 0 auto;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: 'Barlow', system-ui, sans-serif;
+      /* marco tipo diploma que encierra todo el documento de punta a punta
+         (también se imprime, ver @media print). Usa el plomo más oscuro
+         para que se vea bien contra el gris claro de la pantalla. */
+      border: 2px solid var(--blue-dark);
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+      padding-bottom: clamp(6px, 1cqw, 10px);
+    }
+
+    /* --- cabecera --- */
+    .cert-header {
+      display: flex;
+      align-items: stretch;
+      padding-top: clamp(6px, 1cqw, 10px);
+    }
+
+    /* Encabezado izquierdo en COLUMNA: rubro, logo, nombre, propietario,
+   dirección y celular, apilados y centrados horizontalmente. Todo el
+   bloque queda centrado verticalmente contra la franja azul. */
+    .cert-brand {
+      flex: 0 1 38%;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      gap: clamp(2px, 0.5cqw, 5px);
+      padding: clamp(14px, 3cqw, 30px) clamp(10px, 2.2cqw, 22px);
+    }
+
+    .cert-brand > * {
+      margin: 0;
+      max-width: 100%;
+    }
+
+    /* Logo: sin marco ni fondo (se apoya directo sobre el papel), más
+   grande que antes. object-fit: contain => nunca se deforma ni recorta.
+   El clamp mantiene el escalado fluido en la vista previa angosta. */
+    .cert-logo {
+      width: clamp(120px, 27cqw, 240px);
+      /* aspect-ratio nativo de logo.png (1152x922) => sin height fijo y
+         sin letterbox: la caja ES la imagen visible. */
+      aspect-ratio: 1152 / 922;
+      flex-shrink: 0;
+      /* margen superior negativo: sube el logo para que anide justo bajo
+         el arco recortado. Puede solaparse con las puntas del arco
+         (permitido); el logo pinta DESPUÉS que el SVG en el DOM, así que
+         la imagen del logo nunca queda tapada por el texto del arco. */
+      margin: clamp(-18px, -2.2cqw, -10px) 0 clamp(4px, 0.8cqw, 8px);
+    }
+
+    .cert-logo img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+    }
+
+    .cert-logo[hidden] {
+      display: none;
+    }
+
+    /* El rubro se dibuja en arco sobre el logo con <textPath>. */
+    .cert-eyebrow {
+      line-height: 0;
+      width: 100%;
+      /* z-index: el arco baja sobre el logo y se pinta ENCIMA (no detrás).
+         No cambia el layout: position:relative sin desplazamiento. */
+      position: relative;
+      z-index: 1;
+    }
+
+    /* Arco "ESTACIÓN DE SERVICIO Y LAVADO": en el flujo (como antes) y centrado
+       con margin-inline:auto. El viewBox 0 0 300 132 contiene TODO el texto curvado
+       (la fuente va embebida en el <svg>, ver arriba), así la exportación a imagen
+       lo captura completo sin depender de overflow. La caja del SVG es más alta que
+       antes; los márgenes negativos simétricos —con el MISMO valor que el ancho real
+       del SVG— devuelven ese alto extra: footprint = (68/280)·ancho, idéntico a
+       antes, y el centro del arco cae donde caía el de la caja vieja. Logo, franja,
+       íconos, N° y alto total quedan EXACTAMENTE en su lugar, a cualquier ancho. */
+    .cert-eyebrow-arc {
+      display: block;
+      width: min(100%, clamp(200px, 42cqw, 300px));
+      margin-inline: auto;
+      /* Caja: alto = ancho·132/300 = 0.44·ancho.  Alto viejo = ancho·68/280 =
+         0.24286·ancho.  Creció 0.19714·ancho => márgenes negativos iguales de la
+         mitad (0.098571 del MISMO ancho real del SVG). footprint = (68/280)·ancho. */
+      margin-top: calc(min(100%, clamp(200px, 42cqw, 300px)) * -0.0985714);
+      margin-bottom: calc(min(100%, clamp(200px, 42cqw, 300px)) * -0.0985714);
+      height: auto;
+      overflow: visible;
+      pointer-events: none;
+    }
+
+    .cert-eyebrow-arc-text {
+      /* 'BarlowArc' = Barlow 800 embebida en el <svg> (para que la exportación
+         mida igual que el navegador). Fallbacks por si el data-URI fallara. */
+      font-family: 'BarlowArc', 'Barlow', Arial, Helvetica, sans-serif;
+      /* font-size en unidades del viewBox (no px de pantalla): escala junto
+         con el SVG, así la relación texto/largo-de-path es fija y el texto
+         nunca se corta. 20u en el viewBox de 300 ≈ 18.8px de pantalla al máximo. */
+      font-size: 20px;
+      font-weight: 800;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      fill: #2b2b2b;
+    }
+
+    .cert-address-line {
+      font-size: clamp(9.5px, 1.15cqw, 11.5px);
+      color: #666;
+      line-height: 1.25;
+      white-space: pre-line;
+      /* respeta los saltos de línea del textarea */
+    }
+
+    .cert-phone-line {
+      font-size: clamp(9.5px, 1.2cqw, 12px);
+      font-weight: 700;
+      color: #333;
+      line-height: 1.25;
+    }
+
+    .cert-phone-line[hidden],
+    .cert-eyebrow[hidden] {
+      display: none;
+    }
+
+    /* Columna derecha de la cabecera: fila de íconos arriba, franja
+   azul con el título abajo. Ocupa el mismo ancho que antes tenía
+   la franja azul sola (no todo el encabezado). */
+    .cert-title-col {
+      flex: 1 1 62%;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      /* baja la franja azul + fila de vehículos para que queden
+         centradas verticalmente contra el bloque izquierdo (logo/arco) */
+      padding-top: clamp(24px, 5.9cqw, 52px);
+    }
+
+    .cert-vehicle-icons {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: clamp(6px, 1.4cqw, 14px);
+      padding: clamp(8px, 1.8cqw, 18px) clamp(12px, 2.6cqw, 26px);
+      /* sin caja ni fondo: la fila queda apoyada justo debajo de la franja azul */
+    }
+
+    /* Las 4 imágenes tienen proporciones distintas (volquete 1.24,
+       camioneta 1.78, furgón 1.69, tractor 1.39). Para que se vean
+       "del mismo tamaño", en fila y con separación uniforme, cada una
+       ocupa una celda flexible idéntica -flex: 1 1 0 => mismo ancho-
+       y de alto fijo; object-fit: contain escala el dibujo dentro de
+       esa celda sin deformarlo ni recortarlo y lo centra. Así las 4
+       celdas son idénticas, el gap queda parejo y la fila nunca
+       desborda, sin importar el ancho real del contenedor
+       (pantalla / PNG exportado / PDF).
+       NOTA: NO usar max-width en px/%: al topar el ancho, la imagen
+       conserva proporción y también pierde altura -> se ve "chica"
+       y desalineada respecto a las demás (bug anterior). */
+    .cert-vehicle-icons img {
+      flex: 1 1 0;
+      min-width: 0;
+      width: 100%;
+      height: clamp(34px, 7.6cqw, 72px);
+      object-fit: contain;
+      object-position: center;
+      /* colores originales del PNG, sin filtro */
+    }
+
+    .cert-title-band {
+      position: relative;
+      flex: 0 0 auto;
+      background: var(--blue-mid);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: clamp(9px, 1.6cqw, 15px) clamp(10px, 2.4cqw, 24px);
+      overflow: hidden;
+    }
+
+    /* Línea de acento al inicio de la franja del título. Pseudo-elemento
+       absoluto: no ocupa espacio en el flujo => no cambia el tamaño de la
+       franja, del certificado ni de ningún otro elemento. Queda recortado
+       al borde de la franja por el overflow: hidden de arriba. */
+    .cert-title-band::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: clamp(4px, 0.7cqw, 6px);
+      background: var(--blue-dark);
+      pointer-events: none;
+    }
+
+    .cert-title-text {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: clamp(18px, 3.2cqw, 32px);
+      letter-spacing: .02em;
+      text-transform: uppercase;
+      line-height: 1.15;
+      overflow-wrap: break-word;
+      text-align: center;
+    }
+
+    /* --- número de certificado --- */
+    /* Debajo del encabezado, alineado a la derecha. En ROJO, negrita y
+       grande (~24-28px a tamaño de diseño/exportación) como en la
+       referencia. El "N°" también en rojo para que lea como una sola
+       unidad. */
+    .cert-number-row {
+      text-align: right;
+      padding: 0 clamp(12px, 2.6cqw, 26px) 0;
+      /* sube la fila hasta el nivel de la línea "Cel:" del bloque
+         izquierdo; en cqw para que el desplazamiento escale igual que el
+         resto del header en pantalla, PDF e impresión. Arrastra hacia
+         arriba también el contenido que va debajo (frase, datos,
+         producto…), liberando ~41px para "Producto utilizado". */
+      margin-top: clamp(-48px, -4.4cqw, -28px);
+      font-size: clamp(14px, 2.1cqw, 21px);
+      font-weight: 700;
+      color: var(--red);
+      line-height: 1.1;
+    }
+
+    .cert-number {
+      color: var(--red);
+      font-size: clamp(18px, 3.1cqw, 28px);
+      font-weight: 800;
+      letter-spacing: .01em;
+      margin-left: 6px;
+      white-space: nowrap;
+    }
+
+    /* --- frase de certificación --- */
+    .cert-statement {
+      margin: clamp(8px, 1.5cqw, 14px) clamp(12px, 2.6cqw, 26px) 4px;
+      font-size: clamp(12.5px, 1.7cqw, 16px);
+      font-weight: 600;
+      line-height: 1.5;
+      color: #20263a;
+    }
+
+    /* --- bloque de datos con marca de agua --- */
+    .cert-data-block {
+      position: relative;
+      margin: clamp(8px, 1.5cqw, 13px) clamp(12px, 2.6cqw, 26px) 0;
+      padding: clamp(12px, 2.6cqw, 24px) clamp(10px, 2cqw, 20px);
+      border: 1px solid #e3e8f2;
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .cert-watermark {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      /* apenas perceptible: es una marca de fondo (logo del negocio), no
+         debe competir con los datos. El logo tiene más peso visual que la
+         silueta anterior, por eso un pelo menos de opacidad. */
+      opacity: .06;
+      pointer-events: none;
+    }
+
+    .cert-watermark img {
+      /* 90% del alto de la caja: el logo (apaisado) entra completo, con
+         margen arriba y abajo, sin recortarse por el overflow:hidden. */
+      height: 90%;
+      width: auto;
+      object-fit: contain;
+    }
+
+    .cert-data-grid {
+      position: relative;
+      display: grid;
+      grid-template-columns: 1fr;
+      column-gap: clamp(14px, 3.6cqw, 36px);
+      /* sangría suave: mueve todo el bloque de datos un poco a la derecha,
+         sin centrarlo. El borde de la caja y la marca de agua no se mueven. */
+      padding-left: clamp(16px, 3.2cqw, 30px);
+    }
+
+    .cert-field {
+      font-size: clamp(14px, 2.4cqw, 20px);
+      padding: clamp(6px, 1.5cqw, 13px) 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px 6px;
+      /* etiquetas y valores en mayúsculas, estilo certificado oficial;
+         solo visual (dígitos/fechas no se ven afectados) */
+      text-transform: uppercase;
+    }
+
+    .cert-field .label {
+      color: var(--label-blue);
+      font-weight: 800;
+      flex-shrink: 0;
+      min-width: clamp(100px, 17cqw, 165px);
+    }
+
+    .cert-field .value {
+      color: #151515;
+      font-weight: 500;
+    }
+
+    /* --- producto utilizado --- */
+    .cert-product {
+      margin: clamp(10px, 2.2cqw, 20px) clamp(12px, 2.6cqw, 26px) 0;
+    }
+
+    .cert-product-label {
+      font-family: 'Barlow Condensed', sans-serif;
+      font-weight: 700;
+      font-size: clamp(12px, 1.6cqw, 16px);
+      letter-spacing: .06em;
+      color: var(--label-blue);
+      text-transform: uppercase;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .cert-product-icon {
+      width: clamp(12px, 1.7cqw, 17px);
+      height: clamp(12px, 1.7cqw, 17px);
+      fill: var(--label-blue);
+      flex-shrink: 0;
+    }
+
+    .cert-product-text {
+      font-size: clamp(10px, 1.3cqw, 12.5px);
+      line-height: 1.45;
+      color: #2a2a2a;
+      margin: 0;
+      overflow-wrap: break-word;
+      /* un token larguísimo sin espacios (una URL) no debe desbordar */
+    }
+
+    /* --- firma ---
+       Bloque centrado en el ancho del certificado: firma escaneada
+       (firma.png) sobre la raya + nombre y teléfonos fijos. El espacio
+       en blanco simétrico a los lados queda libre para el sello físico. */
+    .cert-signature-row {
+      display: flex;
+      justify-content: center;
+      align-items: flex-end;
+      margin: clamp(14px, 3cqw, 30px) clamp(12px, 2.6cqw, 26px) 0;
+      padding-bottom: clamp(12px, 2.4cqw, 22px);
+    }
+
+    .cert-signature {
+      width: min(260px, 46%);
+      text-align: center;
+    }
+
+    /* Firma escaneada: PNG con transparencia. Apoyada justo sobre la raya
+       (margen inferior negativo) para que el trazo la cruce como una
+       firma real. Sin fondo: el papel del certificado queda a la vista. */
+    .cert-sign-img {
+      display: block;
+      width: clamp(110px, 20cqw, 175px);
+      height: auto;
+      margin: 0 auto clamp(-8px, -1cqw, -4px);
+      background: transparent;
+    }
+
+    .cert-sign-line {
+      border-top: 1.5px solid #333;
+      margin-bottom: 8px;
+    }
+
+    .cert-signer-name {
+      font-weight: 700;
+      font-size: clamp(12.5px, 1.7cqw, 16px);
+    }
+
+    .cert-signer-phone {
+      font-size: clamp(10.5px, 1.3cqw, 13px);
+      color: #666;
+      margin-top: 2px;
+    }
+
+    /* --- pie de página --- */
+    .cert-footer {
+      position: relative;
+      background: var(--blue-dark);
+      color: #fff;
+      text-align: center;
+      font-size: clamp(11px, 1.5cqw, 15px);
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      padding: clamp(12px, 2.2cqw, 22px);
+      overflow: hidden;
+    }
+
+    /* Decoración de la esquina: mini cinta de premio con corte en V
+       (swallowtail). Todo con CSS puro -rectángulo + border-triangle-
+       porque html2canvas 1.4.1 NO rasteriza formas <path> de SVG ni
+       clip-path; los bordes CSS sí se exportan bien. */
+    .cert-footer-deco {
+      position: absolute;
+      left: clamp(14px, 2.8cqw, 26px);
+      top: 0;
+      width: clamp(15px, 2.4cqw, 22px);
+      height: clamp(24px, 4.2cqw, 36px);
+      background: var(--blue-mid);
+    }
+
+    /* pestaña trasera translúcida: efecto de cinta plegada */
+    .cert-footer-deco::before {
+      content: '';
+      position: absolute;
+      left: 46%;
+      top: 0;
+      width: 100%;
+      height: 72%;
+      background: rgba(255, 255, 255, 0.14);
+    }
+
+    /* muesca en V en el extremo inferior (swallowtail): triángulo del
+       color del fondo del pie que "muerde" el borde inferior de la cinta */
+    .cert-footer-deco::after {
+      content: '';
+      position: absolute;
+      left: 0;
+      bottom: 0;
+      width: 0;
+      height: 0;
+      border-left: clamp(7px, 1.2cqw, 11px) solid transparent;
+      border-right: clamp(7px, 1.2cqw, 11px) solid transparent;
+      border-bottom: clamp(5px, 0.9cqw, 8px) solid var(--blue-dark);
+    }
+
+    /* ============================================================
+   3. IMPRESIÓN — solo se imprime el certificado
+   ============================================================ */
+    @media print {
+      @page {
+        size: letter portrait;
+        margin: 10mm;
+      }
+
+      body * {
+        visibility: hidden;
+      }
+
+      /* El formulario y la barra superior salen del flujo por completo:
+         si quedan como "visibility:hidden" siguen ocupando alto y generan
+         una 2ª hoja en blanco cuando el textarea de producto crece. */
+      .topbar,
+      .form-panel {
+        display: none;
+      }
+
+      .app-grid {
+        display: block;
+        padding: 0;
+        margin: 0;
+      }
+
+      /* Aunque la vista previa esté oculta en pantalla (0fr / opacity:0 /
+         display:none en celular), al imprimir SIEMPRE debe salir el
+         certificado. */
+      .preview-panel {
+        display: flex !important;
+        opacity: 1 !important;
+        overflow: visible !important;
+        pointer-events: auto !important;
+      }
+
+      .cert-stage,
+      .cert-stage * {
+        visibility: visible;
+        /* forzar que el navegador imprima los fondos de color
+           (franjas azules, cinta, recuadros) y no solo texto en negro */
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+
+      .cert-stage {
+        box-shadow: none;
+        border: none;
+        padding: 0;
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+      }
+
+      .cert-viewport {
+        overflow: visible;
+      }
+
+      .certificate {
+        width: 100%;
+        max-width: 100%;
+        /* el marco de diploma sí se imprime */
+        border: 2px solid var(--blue-dark);
+        box-shadow: none;
+      }
+
+      .cert-page-number {
+        display: block;
+        position: fixed;
+        right: 0;
+        bottom: 0;
+        font-size: 9px;
+        color: #888;
+        font-family: 'Barlow', system-ui, sans-serif;
+      }
+    }
+    /* ============================================================
+       AJUSTES SOLO-EDITOR sobre el arco (lo unico que cambia el editor)
+       ============================================================ */
+    /* En produccion el SVG del arco tiene pointer-events:none. Aqui lo
+       hacemos agarrable con el mouse. El translateY lo pone el JS. */
+    .cert-eyebrow-arc {
+      pointer-events: bounding-box;
+      cursor: grab;
+      touch-action: none;
+      overflow: visible;
+    }
+    /* respaldo por si el navegador no soporta pointer-events:bounding-box */
+    @supports not (pointer-events: bounding-box) {
+      .cert-eyebrow-arc { pointer-events: auto; }
+    }
+    .cert-eyebrow-arc.ed-dragging { cursor: grabbing; }
+
+    /* Parametros del arco controlados en vivo por la barra superior.
+       Se usa 'Barlow' del navegador (identica en metrica a la 'BarlowArc'
+       embebida en peso 800) para poder variar el peso 700/800/900. */
+    .cert-eyebrow-arc-text {
+      pointer-events: auto;
+      font-family: 'Barlow', Arial, Helvetica, sans-serif;
+      font-size: var(--arc-fs, 20px);
+      font-weight: var(--arc-fw, 800);
+      letter-spacing: var(--arc-ls, 0px);
+    }
+    .cert-eyebrow-arc.ed-dragging .cert-eyebrow-arc-text { opacity: .9; }
+    .cert-eyebrow-arc.ed-highlight .cert-eyebrow-arc-text {
+      paint-order: stroke;
+      stroke: #1a3d8f;
+      stroke-width: .7px;
+    }
+
+    .ed-guide {
+      position: absolute;
+      left: 0; right: 0;
+      height: 0;
+      border-top: 1px dashed;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .ed-guide.arc { border-color: #1a3d8f; }
+    .ed-guide.logo { border-color: #c0281c; }
+    .ed-guide span {
+      position: absolute; left: 4px;
+      font: 700 10px/1 'Barlow', sans-serif;
+      padding: 1px 4px; border-radius: 4px; color: #fff;
+    }
+    .ed-guide.arc span { background: #1a3d8f; top: -15px; }
+    .ed-guide.logo span { background: #c0281c; top: 2px; left: auto; right: 4px; }
+    .ed-guide[hidden] { display: none; }
+
+    .ed-copybox { max-width: 850px; margin: 0 auto 90px; padding: 0 20px; }
+    .ed-copybox pre {
+      background: #10233f; color: #dbe6ff; border-radius: 10px; padding: 16px 18px;
+      font: 12.5px/1.55 ui-monospace, Menlo, Consolas, 'Barlow', monospace;
+      white-space: pre-wrap; word-break: break-word; margin: 0;
+    }
+    .ed-toast {
+      position: fixed; left: 50%; bottom: 28px;
+      transform: translateX(-50%) translateY(20px);
+      background: #0d2b6b; color: #fff; padding: 10px 18px; border-radius: 999px;
+      font-size: 13px; font-weight: 700; opacity: 0; pointer-events: none;
+      transition: opacity .2s, transform .2s; z-index: 100;
+    }
+    .ed-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  </style>
+</head>
+
+<body>
+
+  <div class="ed-bar" id="edBar">
+    <div class="ed-bar-top">
+      <h1>Editor del arco</h1>
+      <div class="ed-readouts">
+        <span>Posici&oacute;n: <b id="roOffset">0.0 px</b></span>
+        <span>Sep. arco &#8596; logo: <b id="roGap">&#8211;</b></span>
+        <span>El texto abarca: <b id="roSpan">&#8211;</b></span>
+      </div>
+      <div class="ed-actions">
+        <label class="ed-ctrl" style="gap:5px;font-size:12px;"><input type="checkbox" id="edGuides" checked> gu&iacute;as</label>
+        <button class="ed-btn" id="edReset">Reiniciar todo</button>
+        <button class="ed-btn primary" id="edCopy">Copiar valores</button>
+      </div>
+    </div>
+
+    <div class="ed-controls">
+      <div class="ed-ctrl">
+        <span class="ed-ctrl-label">Posici&oacute;n Y (px)</span>
+        <input type="range" id="cPos" min="-120" max="120" step="0.5" value="0">
+        <input type="text" id="cPosN" inputmode="decimal" value="0">
+      </div>
+
+      <div class="ed-ctrl">
+        <span class="ed-ctrl-label">Tama&ntilde;o (px)</span>
+        <input type="range" id="cSize" min="10" max="34" step="0.5" value="20">
+        <input type="number" id="cSizeN" min="6" max="60" step="0.5" value="20">
+      </div>
+
+      <div class="ed-ctrl">
+        <span class="ed-ctrl-label">Radio / curv.</span>
+        <input type="range" id="cRad" min="80" max="280" step="1" value="138.8">
+        <input type="number" id="cRadN" min="60" max="600" step="0.1" value="138.8">
+      </div>
+
+      <div class="ed-ctrl" id="ctrlSpan">
+        <label class="ed-inline"><input type="checkbox" id="cSpanOn"> Apertura&deg;</label>
+        <input type="range" id="cSpan" min="60" max="200" step="1" value="141" disabled>
+        <input type="number" id="cSpanN" min="30" max="330" step="1" value="141" disabled>
+      </div>
+
+      <div class="ed-ctrl">
+        <span class="ed-ctrl-label">Espaciado (px)</span>
+        <input type="range" id="cTrack" min="-2" max="14" step="0.25" value="0">
+        <input type="number" id="cTrackN" min="-5" max="30" step="0.25" value="0">
+      </div>
+
+      <div class="ed-ctrl">
+        <span class="ed-ctrl-label">Peso fuente</span>
+        <select id="cWeight">
+          <option value="700">700 &mdash; Bold</option>
+          <option value="800" selected>800 &mdash; ExtraBold</option>
+          <option value="900">900 &mdash; Black</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="ed-hint">
+      Arrastr&aacute; el texto con el mouse (o us&aacute; <b>Posici&oacute;n Y</b> / teclas &#8593;&#8595;, Shift = 10&nbsp;px).
+      <b>Apertura</b>: si la activ&aacute;s, se fuerza al texto a ocupar exactamente esos grados de arco
+      (el espaciado entre letras pasa a estar mandado por la apertura). &laquo;Copiar valores&raquo; junta
+      TODO (posici&oacute;n, tama&ntilde;o, curvatura, apertura, espaciado, peso) en un solo bloque. No toca index.html.
+    </div>
+  </div>
+
+  <div class="ed-stage-wrap">
+   <div class="ed-stage-card">
+    <div class="cert-stage">
+      <div class="cert-viewport">
+        <div class="ed-guide arc" id="edGuideArc" hidden><span>arco</span></div>
+        <div class="ed-guide logo" id="edGuideLogo" hidden><span>logo</span></div>
+          <div class="certificate" id="certificate">
+
+            <div class="cert-header">
+              <div class="cert-brand">
+                <div class="cert-eyebrow" id="certEyebrow">
+                  <!-- Arco del rubro. Puntos clave para que NO se corte al EXPORTAR:
+                       - La fuente Barlow 800 va EMBEBIDA acá abajo como @font-face
+                         (woff2 base64, subset). html2canvas serializa este <svg> a
+                         un <img> aislado que NO ve las fuentes de la pagina; con la
+                         fuente embebida, exportacion y navegador miden IGUAL.
+                       - viewBox 0 0 300 132: alto (132) para contener el texto
+                         curvado; ancho con ~15u de aire a cada lado del texto.
+                       - El alto extra de la caja se devuelve con margenes negativos
+                         simetricos => logo, franja, iconos y N no se mueven. -->
+                  <svg class="cert-eyebrow-arc" viewBox="0 0 300 132"
+                    xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                    role="img" aria-label="Estación de servicio y lavado">
+                    <defs>
+                      <style>
+                        @font-face {
+                          font-family: 'BarlowArc';
+                          font-style: normal;
+                          font-weight: 800;
+                          src: url(data:font/woff2;base64,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) format('woff2');
+                        }
+                      </style>
+                      <!-- Mitad SUPERIOR de un círculo grande (radio 138.8, centro
+                           150,174) centrado sobre el logo. El texto va pegado a la
+                           línea, por dentro, solo en la parte de arriba (±63.7° el
+                           texto sobre un path de ±70.5°, ~88% => no se corta). -->
+                      <path id="certEyebrowArcPath" d="M 19.17,127.67 A 138.8,138.8 0 0 1 280.83,127.67" fill="none"></path>
+                    </defs>
+                    <text class="cert-eyebrow-arc-text" text-anchor="middle" dominant-baseline="middle">
+                      <textPath href="#certEyebrowArcPath" xlink:href="#certEyebrowArcPath"
+                        startOffset="50%" id="certEyebrowText">ESTACIÓN DE SERVICIO Y LAVADO</textPath>
+                    </text>
+                  </svg>
+                </div>
+                <div class="cert-logo" id="certLogo">
+                  <img id="certLogoImg" src="logo.png" alt="Logo del negocio">
+                </div>
+                <div class="cert-address-line" id="certAddressLine">Av. Marcelo Quiroga Santa Cruz #87 - 7° anillo
+                  entre la
+                  Av. Miguel de Cervantes y Av. Olímpica</div>
+                <div class="cert-phone-line" id="certPhoneLine">Cel: 64402668</div>
+              </div>
+
+              <div class="cert-title-col">
+                <div class="cert-title-band">
+                  <div class="cert-title-text">CERTIFICADO DE LAVADO,
+                    DESINFECCIÓN Y MANTENIMIENTO DE TANQUE</div>
+                </div>
+                <div class="cert-vehicle-icons">
+                  <img src="certificado-imagenes/iconos/volvo.png" alt="">
+                  <img src="certificado-imagenes/iconos/auto4xx4.png" alt="">
+                  <img src="certificado-imagenes/iconos/transportador.png" alt="">
+                  <img src="certificado-imagenes/iconos/cargero.png" alt="">
+                </div>
+              </div>
+            </div>
+
+            <div class="cert-number-row">N° <span class="cert-number"
+                id="certNumber">196/2026</span></div>
+
+            <!-- Frase de certificación: texto FIJO del certificado (no editable,
+                 sin campo en el formulario). -->
+            <p class="cert-statement">Nos permitimos certificar
+              el lavado de tanque interior y desinfección</p>
+
+            <div class="cert-data-block">
+              <div class="cert-watermark" aria-hidden="true">
+                <img src="Logo-Fondo-gris.png" alt="">
+              </div>
+              <div class="cert-data-grid">
+                <div class="cert-field"><span class="label">Placa:</span><span
+                    class="value" id="d-plate">1234-ABC</span></div>
+                <div class="cert-field"><span class="label">Marca:</span><span
+                    class="value" id="d-brand">Volvo FH 440</span></div>
+                <div class="cert-field"><span class="label">Color:</span><span
+                    class="value" id="d-color">Blanco</span></div>
+                <div class="cert-field"><span
+                    class="label">Conductor:</span><span class="value" id="d-driver">Marcelo Rojas Fernández</span>
+                </div>
+                <div class="cert-field"><span
+                    class="label">Licencia:</span><span class="value" id="d-license">4587412 Cat. P</span></div>
+                <div class="cert-field"><span
+                    class="label">Empresa:</span><span class="value" id="d-company">Transportes San Miguel</span>
+                </div>
+                <div class="cert-field"><span
+                    class="label">Teléfono:</span><span class="value" id="d-companyPhone">33012345</span></div>
+                <div class="cert-field"><span class="label">Fecha de
+                    lavado:</span><span class="value" id="d-washDate">04/09/2026</span></div>
+              </div>
+            </div>
+
+            <div class="cert-product">
+              <div class="cert-product-label">
+                <svg class="cert-product-icon" viewBox="0 0 24 24">
+                  <path d="M12 2C12 2 5 10.5 5 15a7 7 0 0 0 14 0C19 10.5 12 2 12 2z" />
+                </svg>
+                Producto utilizado
+              </div>
+              <p class="cert-product-text" id="d-product">Hipoclorito de sodio al 5%, detergente desengrasante
+                industrial biodegradable y agua a presión. Enjuague final con agua potable clorada.</p>
+            </div>
+
+            <div class="cert-signature-row">
+              <!-- bloque de firma centrado; el espacio en blanco simétrico
+                   a los lados queda libre para el sello físico a mano -->
+              <div class="cert-signature">
+                <img class="cert-sign-img" src="firma.png" alt="Firma">
+                <div class="cert-sign-line"></div>
+                <div class="cert-signer-name">Ing. Miguel Ángel Martínez</div>
+                <div class="cert-signer-phone">77697408 - 63544889</div>
+              </div>
+            </div>
+
+            <div class="cert-footer">Santa Cruz - Bolivia
+              <span class="cert-footer-deco" aria-hidden="true"></span>
+            </div>
+          </div>
+          <div class="cert-page-number">1 de 1</div>
+      </div>
+    </div>
+   </div>
+  </div>
+
+  <div class="ed-copybox">
+    <pre id="edOut"></pre>
+  </div>
+
+  <div class="ed-toast" id="edToast">Copiado</div>
+
+  <script>
+    (function () {
+      'use strict';
+
+      // ---- constantes de geometria (coinciden con el arco de produccion) ----
+      var PROD_FACTOR = -0.0985714;  // margen simetrico actual de .cert-eyebrow-arc
+      var APEX_Y = 35.2;             // y (unidades viewBox) del vertice/apex del arco
+      var CX = 150;                  // centro horizontal del viewBox (0 0 300 132)
+      var LS_KEY = 'lavandero-editor-arco-v2';
+
+      // valores por defecto = reproducen EXACTO el arco de index.html
+      var DEF = { pos: 0, size: 20, radius: 138.8, spanOn: false, span: 141, track: 0, weight: 800 };
+      var state = Object.assign({}, DEF);
+
+      try {
+        var saved = JSON.parse(localStorage.getItem(LS_KEY) || '{}');
+        Object.keys(DEF).forEach(function (k) { if (saved[k] != null) state[k] = saved[k]; });
+      } catch (e) {}
+      // parametros por URL (utiles para revisar/compartir una combinacion):
+      //   ?y=<pos>&size=<px>&rad=<u>&span=<deg>&track=<px>&w=<700|800|900>
+      var QS = new URLSearchParams(location.search);
+      (function (m) {
+        Object.keys(m).forEach(function (p) {
+          var v = parseFloat(QS.get(p));
+          if (!isNaN(v)) state[m[p]] = v;
+        });
+      })({ y: 'pos', size: 'size', rad: 'radius', span: 'span', track: 'track', w: 'weight' });
+      if (QS.has('span')) state.spanOn = true;
+
+      // ---- refs ----
+      var svg = document.querySelector('.cert-eyebrow-arc');
+      var textEl = document.querySelector('.cert-eyebrow-arc-text');
+      var tpEl = document.getElementById('certEyebrowText');     // <textPath>
+      var pathEl = document.getElementById('certEyebrowArcPath');
+      var logoImg = document.getElementById('certLogoImg');
+      var viewport = document.querySelector('.cert-viewport');
+      var bar = document.getElementById('edBar');
+      var stageWrap = document.querySelector('.ed-stage-wrap');
+
+      var roOffset = document.getElementById('roOffset');
+      var roGap = document.getElementById('roGap');
+      var roSpan = document.getElementById('roSpan');
+      var out = document.getElementById('edOut');
+      var toast = document.getElementById('edToast');
+      var edGuides = document.getElementById('edGuides');
+      var guideArc = document.getElementById('edGuideArc');
+      var guideLogo = document.getElementById('edGuideLogo');
+      var cSpanOn = document.getElementById('cSpanOn');
+      var cWeight = document.getElementById('cWeight');
+      var ctrlSpan = document.getElementById('ctrlSpan');
+
+      function el(id) { return document.getElementById(id); }
+      function num(v, d) { v = Number(v); return isFinite(v) ? v.toFixed(d) : '?'; }
+      function deg2rad(d) { return d * Math.PI / 180; }
+
+      // pares slider <-> numero
+      var C = {
+        pos:    { r: 'cPos',   n: 'cPosN',   dec: 1 },
+        size:   { r: 'cSize',  n: 'cSizeN',  dec: 1 },
+        radius: { r: 'cRad',   n: 'cRadN',   dec: 1 },
+        span:   { r: 'cSpan',  n: 'cSpanN',  dec: 0 },
+        track:  { r: 'cTrack', n: 'cTrackN', dec: 2 }
+      };
+
+      // ---- path del arco: apex fijo en (CX, APEX_Y), radio R, apertura spanDeg ----
+      function buildPathD(R, spanDeg) {
+        var h = deg2rad(spanDeg / 2);
+        var cy = APEX_Y + R;
+        var x0 = CX - R * Math.sin(h);
+        var y0 = cy - R * Math.cos(h);
+        var x1 = CX + R * Math.sin(h);
+        var large = spanDeg > 180 ? 1 : 0;
+        return 'M ' + x0.toFixed(2) + ',' + y0.toFixed(2) +
+               ' A ' + R.toFixed(2) + ',' + R.toFixed(2) + ' 0 ' + large + ' 1 ' +
+               x1.toFixed(2) + ',' + y0.toFixed(2);
+      }
+
+      var geom = {};
+
+      function render() {
+        // 1. tipografia (custom props en el <svg>, heredan al <text>)
+        svg.style.setProperty('--arc-fs', state.size + 'px');
+        svg.style.setProperty('--arc-fw', state.weight);
+        svg.style.setProperty('--arc-ls', state.track + 'px');
+
+        // 2. posicion (no altera el layout: es transform)
+        svg.style.transform = 'translateY(' + Number(state.pos).toFixed(2) + 'px)';
+
+        // 3. medir largo natural del texto (sin textLength)
+        tpEl.removeAttribute('textLength');
+        tpEl.removeAttribute('lengthAdjust');
+        var naturalLen = tpEl.getComputedTextLength();
+        var R = Number(state.radius);
+        var naturalSpanDeg = naturalLen / R * 180 / Math.PI;
+
+        // 4. apertura forzada (textLength) o automatica
+        var textSpanDeg = naturalSpanDeg, targetLen = null;
+        if (state.spanOn) {
+          textSpanDeg = Number(state.span);
+          targetLen = R * deg2rad(textSpanDeg);
+          tpEl.setAttribute('textLength', targetLen.toFixed(2));
+          tpEl.setAttribute('lengthAdjust', 'spacing');
+        }
+
+        // 5. path un poco mas ancho que el texto para que no recorte en las puntas
+        var pathSpan = Math.min(340, Math.max(textSpanDeg, naturalSpanDeg) * 1.10 + 6);
+        var d = buildPathD(R, pathSpan);
+        pathEl.setAttribute('d', d);
+
+        geom = { naturalLen: naturalLen, naturalSpanDeg: naturalSpanDeg,
+                 textSpanDeg: textSpanDeg, pathSpan: pathSpan, d: d, targetLen: targetLen };
+
+        try { localStorage.setItem(LS_KEY, JSON.stringify(state)); } catch (e) {}
+        refreshUI();
+      }
+
+      function measureGap() {
+        var t = textEl.getBoundingClientRect();
+        var l = logoImg.getBoundingClientRect();
+        return l.top - t.bottom;   // negativo = el texto se superpone al logo
+      }
+
+      function factors() {
+        var w = svg.getBoundingClientRect().width || 284;
+        var f = Number(state.pos) / w;
+        return { w: w, f: f, top: PROD_FACTOR + f, bottom: PROD_FACTOR - f };
+      }
+
+      function buildCopy() {
+        var g = measureGap();
+        var fc = factors();
+        var bb = textEl.getBBox();
+        var fs = num(state.size, 1).replace(/\.0$/, '');
+        var ls = num(state.track, 2).replace(/0+$/, '').replace(/\.$/, '');
+        var L = [];
+        L.push('======== ARCO "ESTACION DE SERVICIO Y LAVADO" - AJUSTES ========');
+        L.push('Posicion (arrastre Y)    : ' + num(state.pos, 1) + ' px   (' +
+          (state.pos > 0 ? 'mas cerca del logo' : state.pos < 0 ? 'mas lejos del logo' : 'sin cambio') + ')');
+        L.push('Tamano de letra          : ' + num(state.size, 1) + ' px   (produccion = 20)');
+        L.push('Curvatura (radio)        : ' + num(state.radius, 1) + ' u    (menor = mas curvado; produccion = 138.8)');
+        L.push('Apertura del texto       : ' + (state.spanOn
+          ? num(state.span, 0) + ' deg  (FORZADA con textLength)'
+          : 'automatica (mide ' + num(geom.naturalSpanDeg, 1) + ' deg)'));
+        L.push('Espaciado entre letras   : ' + num(state.track, 2) + ' px' +
+          (state.spanOn ? '   (con Apertura activa, el total lo manda la apertura)' : '   (produccion = 0)'));
+        L.push('Peso de fuente           : ' + state.weight + (state.weight != 800 ? '   (!= 800: hay que regenerar la fuente embebida BarlowArc)' : ''));
+        L.push('Separacion arco <-> logo : ' + num(g, 1) + ' px');
+        L.push('BBox del texto (viewBox) : x=' + num(bb.x, 1) + '  y=' + num(bb.y, 1) +
+          '  w=' + num(bb.width, 1) + '  h=' + num(bb.height, 1));
+        L.push('');
+        L.push('---- 1) CSS  ->  .cert-eyebrow-arc-text ----');
+        L.push('  font-size: ' + fs + 'px;');
+        L.push('  font-weight: ' + state.weight + ';');
+        L.push('  letter-spacing: ' + (ls === '' || ls === '0' ? '0' : ls) + 'px;');
+        L.push('');
+        L.push('---- 2) CSS  ->  .cert-eyebrow-arc   (posicion: misma suma que hoy, no mueve el layout) ----');
+        L.push('  margin-top:    calc(min(100%, clamp(200px, 42cqw, 300px)) * ' + fc.top.toFixed(6) + ');');
+        L.push('  margin-bottom: calc(min(100%, clamp(200px, 42cqw, 300px)) * ' + fc.bottom.toFixed(6) + ');');
+        L.push('  /* hoy ambos = ...* ' + PROD_FACTOR.toFixed(7) + '   |   top+bottom = ' + (fc.top + fc.bottom).toFixed(6) + ' */');
+        L.push('');
+        L.push('---- 3) MARKUP del SVG ----');
+        L.push('  <path id="certEyebrowArcPath" d="' + geom.d + '" fill="none"></path>');
+        if (state.spanOn) {
+          L.push('  <textPath ... startOffset="50%" id="certEyebrowText"');
+          L.push('            textLength="' + geom.targetLen.toFixed(2) + '" lengthAdjust="spacing">');
+        } else {
+          L.push('  <textPath ... startOffset="50%" id="certEyebrowText">   (sin textLength)');
+        }
+        var pad = 6;
+        var minX = Math.min(0, bb.x - pad), maxX = Math.max(300, bb.x + bb.width + pad);
+        var minY = Math.min(0, bb.y - pad), maxY = Math.max(132, bb.y + bb.height + pad);
+        var needsVB = (minX < 0 || minY < 0 || maxX > 300 || maxY > 132);
+        L.push('  viewBox ' + (needsVB ? 'SUGERIDO (el texto se sale del actual 0 0 300 132)' : 'sin cambios (0 0 300 132)') +
+          (needsVB ? ' : "' + num(minX, 1) + ' ' + num(minY, 1) + ' ' + num(maxX - minX, 1) + ' ' + num(maxY - minY, 1) + '"' : ''));
+        if (needsVB) L.push('  (si cambia el ALTO del viewBox, recalcular los factores de margen del punto 2)');
+        return L.join('\n');
+      }
+
+      function refreshUI() {
+        roOffset.textContent = num(state.pos, 1) + ' px';
+        roGap.textContent = num(measureGap(), 1) + ' px';
+        roSpan.textContent = num(state.spanOn ? state.span : geom.naturalSpanDeg, 1) + ' deg';
+        syncInputs();
+        out.textContent = buildCopy();
+        updateGuides();
+      }
+
+      function syncInputs() {
+        Object.keys(C).forEach(function (k) {
+          var c = C[k], r = el(c.r), n = el(c.n), val = state[k];
+          if (document.activeElement !== r) r.value = val;
+          if (document.activeElement !== n) n.value = Number(val).toFixed(c.dec);
+        });
+        if (document.activeElement !== cWeight) cWeight.value = String(state.weight);
+        cSpanOn.checked = !!state.spanOn;
+        el('cSpan').disabled = !state.spanOn;
+        el('cSpanN').disabled = !state.spanOn;
+        ctrlSpan.classList.toggle('is-off', !state.spanOn);
+      }
+
+      function updateGuides() {
+        if (!edGuides.checked) { guideArc.hidden = true; guideLogo.hidden = true; return; }
+        var vp = viewport.getBoundingClientRect();
+        var t = textEl.getBoundingClientRect();
+        var l = logoImg.getBoundingClientRect();
+        guideArc.hidden = false; guideLogo.hidden = false;
+        guideArc.style.top = (t.bottom - vp.top) + 'px';
+        guideLogo.style.top = (l.top - vp.top) + 'px';
+      }
+
+      function layoutBar() { stageWrap.style.marginTop = (bar.offsetHeight + 28) + 'px'; }
+
+      // ---- cablear controles slider/numero ----
+      Object.keys(C).forEach(function (k) {
+        var c = C[k], r = el(c.r), n = el(c.n);
+        r.addEventListener('input', function () { state[k] = parseFloat(r.value); render(); });
+        n.addEventListener('input', function () {
+          var v = parseFloat(String(n.value).replace(',', '.'));
+          if (isNaN(v)) return;
+          state[k] = v; render();
+        });
+      });
+
+      cSpanOn.addEventListener('change', function () {
+        state.spanOn = cSpanOn.checked;
+        if (state.spanOn && geom.naturalSpanDeg) state.span = Math.round(geom.naturalSpanDeg);
+        render();
+      });
+      cWeight.addEventListener('change', function () { state.weight = parseInt(cWeight.value, 10); render(); });
+      edGuides.addEventListener('change', updateGuides);
+
+      document.getElementById('edReset').addEventListener('click', function () {
+        state = Object.assign({}, DEF);
+        render();
+      });
+
+      // ---- arrastre del texto ----
+      var dragging = false, startY = 0, startPos = 0;
+      svg.addEventListener('pointerdown', function (e) {
+        dragging = true; startY = e.clientY; startPos = Number(state.pos);
+        svg.classList.add('ed-dragging');
+        try { svg.setPointerCapture(e.pointerId); } catch (err) {}
+        e.preventDefault();
+      });
+      svg.addEventListener('pointermove', function (e) {
+        if (!dragging) return;
+        state.pos = Math.round((startPos + (e.clientY - startY)) * 10) / 10;
+        render();
+      });
+      function endDrag(e) {
+        if (!dragging) return;
+        dragging = false; svg.classList.remove('ed-dragging');
+        try { svg.releasePointerCapture(e.pointerId); } catch (err) {}
+      }
+      svg.addEventListener('pointerup', endDrag);
+      svg.addEventListener('pointercancel', endDrag);
+      svg.addEventListener('pointerenter', function () { svg.classList.add('ed-highlight'); });
+      svg.addEventListener('pointerleave', function () { svg.classList.remove('ed-highlight'); });
+
+      // ---- teclado: posicion ----
+      window.addEventListener('keydown', function (e) {
+        if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName || '')) return;
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        var step = e.shiftKey ? 10 : 1;
+        state.pos = Number(state.pos) + (e.key === 'ArrowDown' ? step : -step);
+        render();
+      });
+
+      // ---- copiar ----
+      document.getElementById('edCopy').addEventListener('click', function () {
+        var txt = buildCopy();
+        function done() { toast.classList.add('show'); setTimeout(function () { toast.classList.remove('show'); }, 1600); }
+        function fb() {
+          var ta = document.createElement('textarea'); ta.value = txt;
+          document.body.appendChild(ta); ta.select();
+          try { document.execCommand('copy'); } catch (e) {}
+          document.body.removeChild(ta); done();
+        }
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, fb);
+        else fb();
+      });
+
+      window.addEventListener('resize', function () { layoutBar(); refreshUI(); });
+      window.addEventListener('load', function () { layoutBar(); render(); });
+      if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { layoutBar(); render(); });
+
+      layoutBar();
+      render();
+    })();
+  </script>
+
+</body>
+
+</html>

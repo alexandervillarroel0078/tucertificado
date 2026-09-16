@@ -9,7 +9,7 @@ const DATOS_NEGOCIO_PREDEFINIDOS = {
   nombre: "Jomar",
   propietario: "Prop. Ing. Miguel Ángel Martínez Durán",
   direccion: "Av. Marcelo Quiroga Santa Cruz #87 - 7° anillo entre la\nAv. Miguel de Cervantes y Av. Olímpica",
-  telefono: "776-97408 - 63544889",
+  telefono: "64402668",
   logo: ""
 };
 // ============================================
